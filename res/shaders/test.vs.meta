@@ -1,0 +1,27 @@
+[modules]
+>Fog.fsm
+-terminateOnZero=false
+-activeUniform=true
+
+>SimplexNoise
+>1d=false
+>2d=true
+>3d=false
+
+>Lighting
+-defferedMode=false
+-maxLights=20
+
+[in]
+>pos : name="vertex pos group" vertexCount=4 policy=REQUIRED,UNIQUE
+-pos1D = float : LOCAL_POS_1D
+-pos2D = vec2 : LOCAL_POS_2D
+-pos3D = vec3 : LOCAL_POS_3D
+-pos4D = vec4 : LOCAL_POS_4D
+-uv = vec2 : TEXTURE_UV - NOT_REQUIRED
+-color = vec4 : VERTEX_COLOR - NOT_REQUIRED
+
+[out]
+-pos : vec4 - VT_POSITION
+-uv !IN_COPY
+-color !IN_COPY

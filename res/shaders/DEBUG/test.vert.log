@@ -1,0 +1,6 @@
+ERROR: C:\Users\LapisSea PC\Programming\Java\FastFolderUtil\VulkanNutCracker\res\shaders\test.vert:23: 'pos2d' : undeclared identifier 
+ERROR: C:\Users\LapisSea PC\Programming\Java\FastFolderUtil\VulkanNutCracker\res\shaders\test.vert:23: '' : compilation terminated 
+ERROR: 2 compilation errors.  No code generated.
+
+
+SPIR-V is not generated for failed compile or link
