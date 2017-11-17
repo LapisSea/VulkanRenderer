@@ -20,8 +20,9 @@
 	<properties>
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
-		<lwjgl.version>3.1.3-SNAPSHOT</lwjgl.version>
-		<joml.version>1.9.4</joml.version>
+		<lwjgl.version>3.1.4-SNAPSHOT</lwjgl.version>
+		<joml.version>1.9.6</joml.version>
+		<steamworks4j.version>1.6.2</steamworks4j.version>
 	</properties>
 
 	<dependencies>
@@ -107,28 +108,29 @@
 			<artifactId>joml</artifactId>
 			<version>${joml.version}</version>
 		</dependency>
-        <dependency>
-            <groupId>net.sf.trove4j</groupId>
-            <artifactId>trove4j</artifactId>
-            <version>RELEASE</version>
-        </dependency>
-        <dependency>
-            <groupId>Tester</groupId>
-            <artifactId>Tester</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
-        </dependency>
-    </dependencies>
+		<dependency>
+			<groupId>com.code-disaster.steamworks4j</groupId>
+			<artifactId>steamworks4j</artifactId>
+			<version>${steamworks4j.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>net.sf.trove4j</groupId>
+			<artifactId>trove4j</artifactId>
+			<version>RELEASE</version>
+		</dependency>
+		<dependency>
+			<groupId>Tester</groupId>
+			<artifactId>Tester</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+	</dependencies>
 
 	<repositories>
 		<repository>
 			<id>sonatype-snapshots</id>
 			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
-			<releases>
-				<enabled>false</enabled>
-			</releases>
-			<snapshots>
-				<enabled>true</enabled>
-			</snapshots>
+			<releases><enabled>false</enabled></releases>
+			<snapshots><enabled>true</enabled></snapshots>
 		</repository>
 	</repositories>
 
@@ -136,9 +138,7 @@
 		<profile>
 			<id>lwjgl-natives-linux</id>
 			<activation>
-				<os>
-					<family>unix</family>
-				</os>
+				<os><family>unix</family></os>
 			</activation>
 			<properties>
 				<lwjgl.natives>natives-linux</lwjgl.natives>
@@ -147,9 +147,7 @@
 		<profile>
 			<id>lwjgl-natives-macos</id>
 			<activation>
-				<os>
-					<family>mac</family>
-				</os>
+				<os><family>mac</family></os>
 			</activation>
 			<properties>
 				<lwjgl.natives>natives-macos</lwjgl.natives>
@@ -158,13 +156,12 @@
 		<profile>
 			<id>lwjgl-natives-windows</id>
 			<activation>
-				<os>
-					<family>windows</family>
-				</os>
+				<os><family>windows</family></os>
 			</activation>
 			<properties>
 				<lwjgl.natives>natives-windows</lwjgl.natives>
 			</properties>
 		</profile>
 	</profiles>
+
 </project>

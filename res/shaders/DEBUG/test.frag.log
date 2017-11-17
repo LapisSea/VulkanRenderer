@@ -1,7 +1,1 @@
-ERROR: C:\Users\LapisSea PC\Programming\Java\FastFolderUtil\VulkanNutCracker\res\shaders\test.frag:10: 'pow' : no matching overloaded function found 
-ERROR: C:\Users\LapisSea PC\Programming\Java\FastFolderUtil\VulkanNutCracker\res\shaders\test.frag:10: 'assign' :  cannot convert from ' const float' to 'layout( location=0) out highp 4-component vector of float'
-ERROR: C:\Users\LapisSea PC\Programming\Java\FastFolderUtil\VulkanNutCracker\res\shaders\test.frag:10: '' : compilation terminated 
-ERROR: 3 compilation errors.  No code generated.
-
-
-SPIR-V is not generated for failed compile or link
+ogramming\Java\FastFolderUtil\VulkanNutCracker\res\shaders\test.frag
