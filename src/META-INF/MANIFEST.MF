@@ -1,4 +1,4 @@
 Manifest-Version: 1.0
-Class-Path: com.lapissea.vulkankimpl
-Main-Class: com.lapissea.vulkankimpl.VulkanRenderImpl
+Class-Path: com.lapissea.vulkanimpl
+Main-Class: com.lapissea.vulkanimpl.VulkanRenderImpl
 
