@@ -10,7 +10,6 @@ import com.lapissea.vulkanimpl.simplevktypes.VkFence;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
-import static com.lapissea.vulkanimpl.BufferUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkModelUploader{
@@ -22,13 +21,14 @@ public class VkModelUploader{
 				indexCount=modelBuilder.getIndexCount();
 			boolean indices16Bit=modelBuilder.indices16Bit();
 			
-			VkBufferMemory stagingMemory=createBufferMem(gpu, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			VkBufferMemory stagingMemory=gpu.createBufferMem(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			VkBufferMemory memory=gpu.createBufferMem(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			
 			stagingMemory.requestMemory(gpu.getDevice(), stack, buff->{
 				modelBuilder.exportData(buff);
 				modelBuilder.exportIndices(buff);
 			});
 			
-			VkBufferMemory memory=createBufferMem(gpu, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			
 			copyBuffer(gpu, stagingMemory.getBuffer(), memory.getBuffer(), size);
 			memory.flushMemory(gpu);
@@ -65,7 +65,7 @@ public class VkModelUploader{
 			
 			Vk.queueWaitIdle(gpu.getTransferQueue());
 			fence.waitFor(gpu);
-
+			
 			vkFreeCommandBuffers(gpu.getDevice(), gpu.getTransferPool().get(), commandBuffer);
 			fence.destroy(gpu);
 		}

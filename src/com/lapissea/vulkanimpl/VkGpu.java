@@ -1,8 +1,7 @@
 package com.lapissea.vulkanimpl;
 
-import com.lapissea.vulkanimpl.simplevktypes.VkCommandPool;
-import com.lapissea.vulkanimpl.simplevktypes.VkFence;
-import com.lapissea.vulkanimpl.simplevktypes.VkSemaphore;
+import com.lapissea.vulkanimpl.model.VkBufferMemory;
+import com.lapissea.vulkanimpl.simplevktypes.*;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.lwjgl.PointerBuffer;
@@ -17,6 +16,7 @@ import java.util.Collection;
 import java.util.List;
 
 import static com.lapissea.vulkanimpl.BufferUtil.*;
+import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkGpu{
@@ -133,7 +133,7 @@ public class VkGpu{
 	
 	public VkQueueFamilyProperties.Buffer getQueueFamilyProperties(){
 		if(queueFamilyProperties==null){
-			try(MemoryStack stack=MemoryStack.stackPush()){
+			try(MemoryStack stack=stackPush()){
 				queueFamilyProperties=Vk.getPhysicalDeviceQueueFamilyProperties(physicalDevice, stack.callocInt(1));
 			}
 		}
@@ -142,7 +142,7 @@ public class VkGpu{
 	
 	public VkSurfaceFormatKHR.Buffer getFormats(){
 		if(formats==null){
-			try(MemoryStack stack=MemoryStack.stackPush()){
+			try(MemoryStack stack=stackPush()){
 				IntBuffer ib   =stack.callocInt(1);
 				int       count=Vk.getPhysicalDeviceSurfaceFormatsKHR(physicalDevice, window, ib);
 				formats=VkSurfaceFormatKHR.calloc(count);
@@ -155,7 +155,7 @@ public class VkGpu{
 	
 	public IntBuffer getPresentModes(){
 		if(presentModes==null){
-			try(MemoryStack stack=MemoryStack.stackPush()){
+			try(MemoryStack stack=stackPush()){
 				
 				int count=Vk.getPhysicalDeviceSurfacePresentModesKHR(physicalDevice, window, stack.callocInt(1));
 				presentModes=MemoryUtil.memAllocInt(count);
@@ -192,7 +192,7 @@ public class VkGpu{
 		if(queueSurfaceId==QUEUE_NULL){
 			VkQueueFamilyProperties.Buffer props=getQueueFamilyProperties();
 			
-			try(MemoryStack stack=MemoryStack.stackPush()){
+			try(MemoryStack stack=stackPush()){
 				IntBuffer ip=stack.callocInt(1);
 				for(int i=0;i<props.capacity();i++){
 					if(Vk.getPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, window, ip)) return queueSurfaceId=i;
@@ -224,7 +224,7 @@ public class VkGpu{
 	
 	public VkDevice getDevice(){
 		if(device==null){
-			try(MemoryStack stack=MemoryStack.stackPush()){
+			try(MemoryStack stack=stackPush()){
 				
 				TIntList ids=new TIntArrayList(3){
 					@Override
@@ -266,7 +266,7 @@ public class VkGpu{
 	
 	
 	private VkQueue createQueue(int id, int queueIndex){
-		try(MemoryStack stack=MemoryStack.stackPush()){
+		try(MemoryStack stack=stackPush()){
 			
 			VkQueue q=Vk.createDeviceQueue(getDevice(), id, queueIndex, stack.callocPointer(1));
 			queues.add(q);
@@ -291,7 +291,7 @@ public class VkGpu{
 	}
 	
 	private VkCommandPool createCommandPool(int id){
-		try(MemoryStack stack=MemoryStack.stackPush()){
+		try(MemoryStack stack=stackPush()){
 			VkCommandPoolCreateInfo poolInfo=VkCommandPoolCreateInfo.callocStack(stack);
 			poolInfo.sType(VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO);
 			poolInfo.queueFamilyIndex(id);
@@ -322,7 +322,7 @@ public class VkGpu{
 	}
 	
 	public VkSemaphore createSemaphore(){
-		try(MemoryStack stack=MemoryStack.stackPush()){
+		try(MemoryStack stack=stackPush()){
 			VkSemaphoreCreateInfo semaphoreInfo=VkSemaphoreCreateInfo.callocStack(stack);
 			semaphoreInfo.sType(VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO);
 			return createSemaphore(semaphoreInfo);
@@ -331,5 +331,44 @@ public class VkGpu{
 	
 	public VkSemaphore createSemaphore(VkSemaphoreCreateInfo semaphoreInfo){
 		return Vk.createSemaphore(getDevice(), semaphoreInfo);
+	}
+	
+	public VkBuffer createBuffer(int size, int usage){
+		try(MemoryStack stack=stackPush()){
+			return Vk.createBuffer(getDevice(), Vk.bufferInfo(stack, size, usage), stack.mallocLong(1));
+		}
+	}
+	
+	public VkDeviceMemory alocateMem(VkMemoryAllocateInfo memAlloc){
+		try(MemoryStack stack=stackPush()){
+			return Vk.allocateMemory(getDevice(), memAlloc, stack.mallocLong(1));
+		}
+	}
+	
+	public VkDeviceMemory alocateMem(long size, VkMemoryRequirements memRequ, int properties){
+		try(MemoryStack stack=stackPush()){
+			
+			VkMemoryAllocateInfo memAlloc=VkMemoryAllocateInfo.callocStack(stack);
+			memAlloc.sType(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO)
+			        .allocationSize(Math.max(memRequ.size(), size))
+			        .memoryTypeIndex(Vk.findMemoryType(getMemoryProperties(), memRequ.memoryTypeBits(), properties));
+			
+			return Vk.allocateMemory(getDevice(), memAlloc, stack.mallocLong(1));
+		}
+	}
+	
+	
+	public VkBufferMemory createBufferMem(int size, int usage, int properties){
+		
+		VkBuffer       buf=createBuffer(size, usage);
+		VkDeviceMemory mem;
+		
+		try(MemoryStack stack=MemoryStack.stackPush()){
+			mem=alocateMem(size, buf.getMemRequirements(this, stack), properties);
+		}
+		
+		mem.bind(getDevice(), buf);
+		
+		return new VkBufferMemory(buf, mem, size);
 	}
 }

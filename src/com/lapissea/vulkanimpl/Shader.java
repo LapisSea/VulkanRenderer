@@ -246,7 +246,7 @@ public class Shader{
 		
 		uniSiz=Float.SIZE*16*3+Float.SIZE;
 		
-		uniformBuffer=BufferUtil.createBufferMem(gpu, uniSiz, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		uniformBuffer=gpu.createBufferMem(uniSiz, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		
 		try(MemoryStack stack=MemoryStack.stackPush()){
 			
@@ -291,10 +291,10 @@ public class Shader{
 		Matrix4f proj =new Matrix4f();
 		
 		double tim=System.currentTimeMillis()/1000D;
-		
+
 //		view.rotate((float)Math.cos((tim)%(Math.PI*2))/3, 0, 1, 0);
 //		view.rotate((float)Math.cos((tim*2)%(Math.PI*2))/3, 1, 1, 0);
-		view.translate(0, 0, -1F);
+		view.translate(0, 0, -0.5F);
 		
 		model.rotate((float)((tim/3)%(Math.PI*2)), 0, 0, 1);
 		

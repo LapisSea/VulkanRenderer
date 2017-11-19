@@ -1,5 +1,6 @@
 package com.lapissea.vulkanimpl;
 
+import com.lapissea.datamanager.DataManager;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -18,6 +19,8 @@ import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -29,6 +32,7 @@ import java.util.Date;
 import java.util.List;
 
 import static com.lapissea.vulkanimpl.BufferUtil.*;
+import static java.awt.image.BufferedImage.*;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryUtil.*;
@@ -75,7 +79,11 @@ public class VulkanRenderImpl{
 	private VkSemaphore imageAvailableSemaphore;
 	private VkSemaphore renderFinishedSemaphore;
 	
+	private DataManager dataManager;
+	
 	public VulkanRenderImpl(){
+		dataManager=new DataManager();
+		dataManager.registerDomain(new File("res"));
 		
 		initWindow();
 		Vk.stack(this::initVulkan);
@@ -85,6 +93,7 @@ public class VulkanRenderImpl{
 		imageAvailableSemaphore=gpu.createSemaphore();
 		renderFinishedSemaphore=gpu.createSemaphore();
 		
+		loadTexture();
 		
 		VkModelBuilder b=new VkModelBuilder(new VkModelFormat(Vec3f.class, ColorM.class));
 		b.put(new Vec3f(-0.5F, -0.5F, 0)).put(new ColorM(1, 0, 0, 1)).done();
@@ -102,6 +111,66 @@ public class VulkanRenderImpl{
 		run();
 		
 		destroy();
+	}
+	
+	
+	private void loadTexture(){
+		//SugDude.jpg
+		BufferedImage img =null;
+		try{
+			img=ImageIO.read(dataManager.getInStream("textures/SmugDude.jpg"));
+			ByteBuffer    data=imgToBuff(img);
+			
+			
+			
+			memFree(data);
+		}catch(IOException e){
+			e.printStackTrace();
+		}
+	}
+	
+	public static ByteBuffer imgToBuff(BufferedImage image){
+		
+		int[] pixels=new int[image.getWidth()*image.getHeight()];
+		image.getRGB(0, 0, image.getWidth(), image.getHeight(), pixels, 0, image.getWidth());
+		ByteBuffer buffer=memAlloc(image.getWidth()*image.getHeight()*image.getColorModel().getPixelSize()/8);
+		
+		for(int y=0;y<image.getHeight();y++){
+			for(int x=0;x<image.getWidth();x++){
+				int pixel=pixels[y*image.getWidth()+x];
+				switch(image.getType()){
+				case TYPE_3BYTE_BGR:
+				case TYPE_INT_RGB:{
+					buffer.put((byte)(pixel>>16&0xFF)); // Red component
+					buffer.put((byte)(pixel>>8&0xFF)); // Green component
+					buffer.put((byte)(pixel&0xFF)); // Blue component
+				}
+				break;
+				case TYPE_4BYTE_ABGR:
+				case TYPE_INT_ARGB:{
+					buffer.put((byte)(pixel>>16&0xFF)); // Red component
+					buffer.put((byte)(pixel>>8&0xFF)); // Green component
+					buffer.put((byte)(pixel&0xFF)); // Blue component
+					buffer.put((byte)(pixel>>24&0xFF)); // Alpha component. Only for RGBA
+				}
+				break;
+				case TYPE_BYTE_GRAY:{
+					buffer.put((byte)pixel);
+				}
+				break;
+				case TYPE_USHORT_GRAY:{
+					buffer.putShort((short)pixel);
+				}
+				break;
+				default:
+					LogUtil.printlnEr(image.getType());
+					throw new IllegalStateException("Unknown type image format: "+image.getColorModel().toString());
+				}
+			}
+		}
+		
+		buffer.flip();
+		return buffer;
 	}
 	
 	private void drawFrame(MemoryStack stack){
@@ -323,7 +392,7 @@ public class VulkanRenderImpl{
 			for(VkPhysicalDevice device : Vk.getPhysicalDevices(stack, instance)){
 				
 				VkGpu gpu      =new VkGpu(window, device, deviceExtensions, layers);
-				int   usability=VkGpuRater.rateGpuInit(gpu,stack);
+				int   usability=VkGpuRater.rateGpuInit(gpu, stack);
 				
 				if(usability<0){
 					gpu.destroy();
@@ -340,7 +409,7 @@ public class VulkanRenderImpl{
 			
 			if((gpu=bestGpu)==null){
 				throw UtilL.exitWithErrorMsg("Sorry! Vulkan supporting "+TextUtil.plural("physicalDevice", deviceCount), "found but minimal requirements are not met! :(\n",
-				                       "Stopping application...");
+				                             "Stopping application...");
 			}
 		}
 		

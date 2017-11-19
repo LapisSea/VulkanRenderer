@@ -8,6 +8,7 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkMappedMemoryRange;
+import org.lwjgl.vulkan.VkMemoryRequirements;
 
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
