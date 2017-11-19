@@ -50,8 +50,8 @@ public class VkGpu{
 	private VkCommandPool graphicsPool;
 	private VkCommandPool transferPool;
 	
-	private Collection<? extends CharSequence> deviceExtensions;
-	private PointerBuffer                      layers;
+	protected Collection<? extends CharSequence> deviceExtensions;
+	private   PointerBuffer                      layers;
 	
 	public VkGpu(GlfwWindow window, VkInstance instance, long pointer, Collection<? extends CharSequence> deviceExtensions, PointerBuffer layers){
 		this(window, new VkPhysicalDevice(pointer, instance), deviceExtensions, layers);

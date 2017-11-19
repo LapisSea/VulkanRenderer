@@ -27,7 +27,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static com.lapissea.vulkanimpl.BufferUtil.*;
 import static org.lwjgl.glfw.GLFW.*;
@@ -317,19 +316,6 @@ public class VulkanRenderImpl{
 				                  "Stopping application...");
 				System.exit(1);
 			}
-
-//			gpu=Arrays.stream(Vk.getPhysicalDevices(stack, instance)).map(d->new VkGpu(window, d, deviceExtensions, layers))
-//			          .map(g->{
-//				          PairM<VkGpu, Integer> r=new PairM<>(g, calcDeviceUsability(g, stack));
-//				          g.destroy();
-//				          return r;
-//			          })
-//			          .filter(d->d.obj2>-1)
-//			          .sorted(Comparator.comparingInt(i->i.obj2))
-//			          .findFirst()
-//			          .map(p->p.obj1)
-//			          .orElseThrow(()->UtilL.exitWithErrorMsg("Sorry! Vulkan supporting "+TextUtil.plural("physicalDevice", deviceCount), "found but minimal requirements are not met! :(\n",
-//			                                                  "Stopping application..."));
 			
 			VkGpu bestGpu      =null;
 			int   bestUsability=-1;
@@ -337,9 +323,12 @@ public class VulkanRenderImpl{
 			for(VkPhysicalDevice device : Vk.getPhysicalDevices(stack, instance)){
 				
 				VkGpu gpu      =new VkGpu(window, device, deviceExtensions, layers);
-				int   usability=calcDeviceUsability(gpu, stack);
+				int   usability=VkGpuRater.rateGpuInit(gpu,stack);
 				
-				if(usability<0) continue;
+				if(usability<0){
+					gpu.destroy();
+					continue;
+				}
 				
 				if(bestUsability<usability){
 					bestUsability=usability;
@@ -349,44 +338,14 @@ public class VulkanRenderImpl{
 				}
 			}
 			
-			if(bestGpu==null) UtilL.exitWithErrorMsg("Sorry! Vulkan supporting "+TextUtil.plural("physicalDevice", deviceCount), "found but minimal requirements are not met! :(\n",
-			                                         "Stopping application...");
-			
-			gpu=bestGpu;
+			if((gpu=bestGpu)==null){
+				throw UtilL.exitWithErrorMsg("Sorry! Vulkan supporting "+TextUtil.plural("physicalDevice", deviceCount), "found but minimal requirements are not met! :(\n",
+				                       "Stopping application...");
+			}
 		}
 		
 		LogUtil.println("Using", VkPhysicalDeviceType.find(gpu.getProperties()), "called", gpu.getProperties().deviceNameString());
 		
-	}
-	
-	private boolean checkDeviceExtensions(MemoryStack stack, VkPhysicalDevice device){
-		return Vk.getDeviceExtensionProperties(stack, device, stack.mallocInt(1))
-		         .stream()
-		         .map(VkExtensionProperties::extensionNameString)
-		         .collect(Collectors.toList())
-		         .containsAll(deviceExtensions);
-	}
-	
-	private int calcDeviceUsability(VkGpu gpu, MemoryStack stack){
-		VkPhysicalDeviceFeatures features=gpu.getFeatures();
-		if(!features.geometryShader()||
-		   !features.shaderClipDistance()||
-		   !features.shaderTessellationAndGeometryPointSize()||
-		   !features.tessellationShader()
-			) return -1;
-		
-		if(!checkDeviceExtensions(stack, gpu.physicalDevice)) return -1;
-		
-		if(gpu.getQueueGraphicsId()==-1||
-		   gpu.getQueueSurfaceId()==-1||
-		   gpu.getFormats().capacity()==0||
-		   gpu.getPresentModes().capacity()==0
-			) return -1;
-		
-		int rating=0;
-		rating+=VkPhysicalDeviceType.find(gpu.getProperties()).rating*100;
-		
-		return rating;
 	}
 	
 	private PointerBuffer getExtensions(MemoryStack stack){
