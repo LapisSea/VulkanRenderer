@@ -1,5 +1,6 @@
 package com.lapissea.vulkanimpl;
 
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vec.color.IColorM;
@@ -117,7 +118,7 @@ public class Vk{
 		case VK_ERROR_VALIDATION_FAILED_EXT:
 			return "A validation layer found an error.";
 		default:
-			return String.format("Unknown ["+Integer.valueOf(code)+"]");
+			return "Unknown ["+code+"]";
 		}
 	}
 	
@@ -145,7 +146,6 @@ public class Vk{
 	public static VkPhysicalDevice[] getPhysicalDevices(MemoryStack stack, VkInstance instance){
 		IntBuffer ib         =stack.callocInt(1);
 		int       deviceCount=Vk.enumeratePhysicalDevices(instance, ib);
-		
 		PointerBuffer physicalDevices=stack.callocPointer(deviceCount);
 		Vk.enumeratePhysicalDevices(instance, ib, physicalDevices);
 		
@@ -320,17 +320,17 @@ public class Vk{
 		return dest;
 	}
 	
-	public static void destroySwapchainKHR(VkDevice device, long swapchain){
-		KHRSwapchain.vkDestroySwapchainKHR(device, swapchain, null);
+	public static void destroySwapchainKHR(VkDevice device, VkSwapchain swapchain){
+		vkDestroySwapchainKHR(device, swapchain.getId(), null);
 	}
 	
-	public static int getSwapchainImagesKHR(VkDevice device, long swapChain, IntBuffer dest, LongBuffer images){
-		int code=KHRSwapchain.vkGetSwapchainImagesKHR(device, swapChain, dest, images);
+	public static int getSwapchainImagesKHR(VkDevice device, VkSwapchain swapChain, IntBuffer dest, LongBuffer images){
+		int code=vkGetSwapchainImagesKHR(device, swapChain.getId(), dest, images);
 		if(DEBUG) check(code);
 		return dest.get(0);
 	}
 	
-	public static int getSwapchainImagesKHR(VkDevice device, long swapChain, IntBuffer dest){
+	public static int getSwapchainImagesKHR(VkDevice device, VkSwapchain swapChain, IntBuffer dest){
 		return getSwapchainImagesKHR(device, swapChain, dest, null);
 	}
 	
@@ -428,7 +428,7 @@ public class Vk{
 	public static VkBuffer createBuffer(VkDevice device, VkBufferCreateInfo bufferInfo, LongBuffer dest){
 		int code=vkCreateBuffer(device, bufferInfo, null, dest);
 		if(DEBUG) check(code);
-		return new VkBuffer(dest.get(0));
+		return new VkBuffer(dest.get(0), bufferInfo.size());
 	}
 	
 	public static VkDeviceMemory allocateMemory(VkDevice device, VkMemoryAllocateInfo allocInfo, LongBuffer dest){
@@ -440,6 +440,11 @@ public class Vk{
 	
 	public static void bindBufferMemory(VkDevice device, VkBuffer buffer, VkDeviceMemory mem, int offset){
 		int code=vkBindBufferMemory(device, buffer.get(), mem.get(), offset);
+		if(DEBUG) check(code);
+	}
+	
+	public static void bindImageMemory(VkDevice device, VkImage image, VkDeviceMemory mem, int offset){
+		int code=vkBindImageMemory(device, image.get(), mem.get(), offset);
 		if(DEBUG) check(code);
 	}
 	
@@ -458,12 +463,16 @@ public class Vk{
 		if(DEBUG) check(code);
 	}
 	
-	public static VkClearValue.Buffer clearVal(IColorM src, VkClearValue.Buffer dest){
+	public static VkClearValue.Buffer clearCol(IColorM src, VkClearValue.Buffer dest){
 		dest.color()
 		    .float32(0, src.r())
 		    .float32(1, src.g())
 		    .float32(2, src.b())
 		    .float32(3, src.a());
+		return dest;
+	}
+	public static VkClearValue.Buffer clearDepth(VkClearValue.Buffer dest){
+		dest.depthStencil().depth(1).stencil(0);
 		return dest;
 	}
 	
@@ -475,30 +484,17 @@ public class Vk{
 		                         .sharingMode(VK_SHARING_MODE_EXCLUSIVE);
 	}
 	
-	public static int findMemoryType(VkPhysicalDeviceMemoryProperties deviceMemoryProperties, int typeBits, int properties){
-		int bits=typeBits;
-		for(int i=0;i<VK_MAX_MEMORY_TYPES;i++){
-			if((bits&1)==1){
-				if((deviceMemoryProperties.memoryTypes(i).propertyFlags()&properties)==properties){
-					return i;
-				}
-			}
-			bits>>=1;
-		}
-		throw new IllegalStateException("unable to find suitable memory type");
-	}
-	
 	public static void queueWaitIdle(VkQueue queue){
 		int code=vkQueueWaitIdle(queue);
 		if(DEBUG) check(code);
 	}
 	
 	public static void queueSubmit(VkQueue queue, VkSubmitInfo info){
-		queueSubmit(queue, info, VK_NULL_HANDLE);
+		queueSubmit(queue, info, VkFence.NULL);
 	}
 	
-	public static void queueSubmit(VkQueue queue, VkSubmitInfo info, long fence){
-		int code=vkQueueSubmit(queue, info, fence);
+	public static void queueSubmit(VkQueue queue, VkSubmitInfo info, VkFence fence){
+		int code=vkQueueSubmit(queue, info, fence.get());
 		if(DEBUG) check(code);
 	}
 	
@@ -543,14 +539,6 @@ public class Vk{
 		if(DEBUG) check(code);
 	}
 	
-	public static VkFence createFence(VkDevice device){
-		try(MemoryStack stack=stackPush()){
-			VkFenceCreateInfo fenceInfo=VkFenceCreateInfo.callocStack(stack);
-			fenceInfo.sType(VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
-			return createFence(device, fenceInfo);
-		}
-	}
-	
 	public static VkFence createFence(VkDevice device, VkFenceCreateInfo fenceInfo){
 		LongBuffer buff=memAllocLong(1);
 		
@@ -562,5 +550,36 @@ public class Vk{
 	public static void waitForFences(VkDevice device, LongBuffer fence){
 		int code=vkWaitForFences(device, fence, true, Integer.MAX_VALUE);
 		if(DEBUG) check(code);
+	}
+	
+	public static VkImage createImage(VkDevice device, VkImageCreateInfo imageInfo, LongBuffer dest){
+		int code=vkCreateImage(device, imageInfo, null, dest);
+		if(DEBUG) check(code);
+		return new VkImage(dest.get(0), imageInfo.extent().width(), imageInfo.extent().height(), imageInfo.format());
+	}
+	
+	public static VkSampler createSampler(VkDevice device, VkSamplerCreateInfo samplerInfo, LongBuffer dest){
+		int code=vkCreateSampler(device, samplerInfo, null, dest);
+		if(DEBUG) check(code);
+		return new VkSampler(dest.get(0));
+	}
+	
+	public static VkImageCreateInfo imageCreateInfo(MemoryStack stack, int width, int height, int format, VkGpu.Feature feature, int usage){
+		return imageCreateInfo(VkImageCreateInfo.callocStack(stack), width, height, format, feature, usage);
+	}
+	
+	public static VkImageCreateInfo imageCreateInfo(VkImageCreateInfo imageInfo, int width, int height, int format, VkGpu.Feature feature, int usage){
+		imageInfo.sType(VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO)
+		         .imageType(VK_IMAGE_TYPE_2D)
+		         .mipLevels(1)
+		         .arrayLayers(1)
+		         .format(format)
+		         .tiling(feature.tiling)
+		         .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
+		         .usage(usage)
+		         .sharingMode(VK_SHARING_MODE_EXCLUSIVE)
+		         .samples(VK_SAMPLE_COUNT_1_BIT);
+		imageInfo.extent().set(width, height, 1);
+		return imageInfo;
 	}
 }

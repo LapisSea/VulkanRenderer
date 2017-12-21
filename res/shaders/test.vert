@@ -10,6 +10,7 @@ layout(binding = 0) uniform UniformBufferObject{
 
 layout(location = 0) in vec3 pos;
 layout(location = 1) in vec4 inColor;
+layout(location = 2) in vec2 inUv;
 
 layout(location = 0) out vec4 color;
 layout(location = 1) out vec2 uv;
@@ -23,7 +24,7 @@ void main() {
 	vec4 p4=vec4(pos, 1.0);
     gl_Position=ubo.proj*ubo.view*ubo.model*p4;
 
-	uv=pos.xy;
+	uv=inUv;
 	tim=ubo.tim;
     color = inColor;
 }

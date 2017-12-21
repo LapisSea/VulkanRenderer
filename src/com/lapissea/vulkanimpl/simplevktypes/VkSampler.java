@@ -1,13 +1,14 @@
 package com.lapissea.vulkanimpl.simplevktypes;
 
+
 import com.lapissea.vulkanimpl.VkGpu;
 import org.lwjgl.vulkan.VkDevice;
 
 import static org.lwjgl.vulkan.VK10.*;
 
-public class VkImageView extends ExtendableLong{
+public class VkSampler extends ExtendableLong{
 	
-	public VkImageView(long val){
+	public VkSampler(long val){
 		super(val);
 	}
 	
@@ -16,7 +17,7 @@ public class VkImageView extends ExtendableLong{
 	}
 	
 	public void destroy(VkDevice device){
-		vkDestroyImageView(device, get(), null);
+		vkDestroySampler(device, get(), null);
 		val=0;
 	}
 }

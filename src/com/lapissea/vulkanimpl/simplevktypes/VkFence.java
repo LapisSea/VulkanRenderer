@@ -11,6 +11,23 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public class VkFence extends ExtendableLong{
 	
+	public static final VkFence NULL;
+	
+	static{
+		NULL=new VkFence(memAllocLong(1).put(0, VK_NULL_HANDLE)){
+			@Override
+			public void destroy(VkDevice device){
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public void waitFor(VkDevice device){
+				throw new UnsupportedOperationException();
+			}
+		};
+		
+	}
+	
 	private LongBuffer buff;
 	
 	public VkFence(LongBuffer buff){

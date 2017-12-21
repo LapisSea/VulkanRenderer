@@ -1,6 +1,5 @@
 package com.lapissea.vulkanimpl.simplevktypes;
 
-import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
 import org.lwjgl.vulkan.VkDevice;
 
@@ -19,13 +18,5 @@ public class VkDeviceMemory extends ExtendableLong{
 	public void destroy(VkDevice device){
 		vkFreeMemory(device, get(), null);
 		val=0;
-	}
-	
-	public void bind(VkDevice device, VkBuffer buffer){
-		bind(device, buffer, 0);
-	}
-	
-	public void bind(VkDevice device, VkBuffer buffer, int offset){
-		Vk.bindBufferMemory(device, buffer, this, offset);
 	}
 }

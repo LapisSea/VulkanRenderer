@@ -7,9 +7,12 @@ layout(location = 2) in float tim;
 
 layout(location = 0) out vec4 outColor;
 
+layout(binding = 1) uniform sampler2D texSampler;
+
 void main() {
-//	if(length(uv)>0.5)discard;
-	outColor = color*sin(length(uv)*(uv.x*600))*sin(uv.x*uv.y*600+tim);
+	outColor=texture(texSampler, uv);
+
+//	if(outColor.b==max(outColor.r,max(outColor.g,outColor.b)))discard;
 //	outColor.r=pow(outColor.r,2);
 //	outColor.g=pow(outColor.g,2);
 //	outColor.b=pow(outColor.b,2);

@@ -5,15 +5,20 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.filechange.FileChageDetector;
+import com.lapissea.vec.Vec2f;
 import com.lapissea.vec.Vec2i;
 import com.lapissea.vec.Vec3f;
 import com.lapissea.vec.color.ColorM;
 import com.lapissea.vec.interf.IVec2iR;
+import com.lapissea.vulkanimpl.model.VkBufferMemory;
 import com.lapissea.vulkanimpl.model.VkModel;
 import com.lapissea.vulkanimpl.model.build.VkModelBuilder;
 import com.lapissea.vulkanimpl.model.build.VkModelUploader;
+import com.lapissea.vulkanimpl.simplevktypes.VkBuffer;
+import com.lapissea.vulkanimpl.simplevktypes.VkImage;
 import com.lapissea.vulkanimpl.simplevktypes.VkRenderPass;
 import com.lapissea.vulkanimpl.simplevktypes.VkSemaphore;
+import com.lapissea.vulkanimpl.util.VkImageAspect;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.system.MemoryStack;
@@ -21,6 +26,8 @@ import org.lwjgl.vulkan.*;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.awt.image.ColorModel;
+import java.awt.image.WritableRaster;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -32,9 +39,9 @@ import java.util.Date;
 import java.util.List;
 
 import static com.lapissea.vulkanimpl.BufferUtil.*;
-import static java.awt.image.BufferedImage.*;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
+import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
@@ -49,9 +56,9 @@ public class VulkanRenderImpl{
 		System.setProperty("joml.nounsafe", "true");
 		
 		TextUtil.__REGISTER_CUSTOM_TO_STRING(VkExtent2D.class, e->e.getClass().getName()+"{h="+e.height()+", w="+e.height()+"}");
-		LogUtil.__.INJECT_FILE_LOG("log.txt");
-		LogUtil.__.INJECT_DEBUG_PRINT(true);
+		LogUtil.__.INIT(true, false, "log");
 		LogUtil.println("STARTED at "+Date.from(Instant.now()));
+		LogUtil.printlnEr("STARTED at "+Date.from(Instant.now()), "\"xD \" ");
 		
 		new VulkanRenderImpl();
 	}
@@ -82,6 +89,7 @@ public class VulkanRenderImpl{
 	private DataManager dataManager;
 	
 	public VulkanRenderImpl(){
+		
 		dataManager=new DataManager();
 		dataManager.registerDomain(new File("res"));
 		
@@ -93,19 +101,37 @@ public class VulkanRenderImpl{
 		imageAvailableSemaphore=gpu.createSemaphore();
 		renderFinishedSemaphore=gpu.createSemaphore();
 		
-		loadTexture();
-		
-		VkModelBuilder b=new VkModelBuilder(new VkModelFormat(Vec3f.class, ColorM.class));
-		b.put(new Vec3f(-0.5F, -0.5F, 0)).put(new ColorM(1, 0, 0, 1)).done();
-		b.put(new Vec3f(+0.5F, -0.5F, 0)).put(new ColorM(0, 1, 0, 1)).done();
-		b.put(new Vec3f(+0.5F, +0.5F, 0)).put(new ColorM(0, 0, 1, 1)).done();
-		b.put(new Vec3f(-0.5F, +0.5F, 0)).put(new ColorM(1, 1, 1, 1)).done();
+		VkModelBuilder b=new VkModelBuilder(new VkModelFormat(Vec3f.class, ColorM.class, Vec2f.class));
+		b.put(new Vec3f(-0.5F, -0.5F, +0.5F)).put(new ColorM(1, 0, 0, 1)).put(new Vec2f(1, 0)).done();
+		b.put(new Vec3f(+0.5F, -0.5F, +0.5F)).put(new ColorM(0, 1, 0, 1)).put(new Vec2f(0, 0)).done();
+		b.put(new Vec3f(+0.5F, +0.5F, +0.5F)).put(new ColorM(0, 0, 1, 1)).put(new Vec2f(0, 1)).done();
+		b.put(new Vec3f(-0.5F, +0.5F, +0.5F)).put(new ColorM(1, 1, 1, 1)).put(new Vec2f(1, 1)).done();
+		b.put(new Vec3f(-0.5F, -0.5F, -0.5F)).put(new ColorM(1, 0, 0, 1)).put(new Vec2f(1, 0)).done();
+		b.put(new Vec3f(+0.5F, -0.5F, -0.5F)).put(new ColorM(0, 1, 0, 1)).put(new Vec2f(0, 0)).done();
+		b.put(new Vec3f(+0.5F, +0.5F, -0.5F)).put(new ColorM(0, 0, 1, 1)).put(new Vec2f(0, 1)).done();
+		b.put(new Vec3f(-0.5F, +0.5F, -0.5F)).put(new ColorM(1, 1, 1, 1)).put(new Vec2f(1, 1)).done();
 		b.indices(0, 1, 2,
-		          0, 2, 3);
+		          0, 2, 3,
+		
+		          6, 5, 4,
+		          7, 6, 4,
+		
+		          4, 1, 0,
+		          5, 1, 4,
+		
+		          2, 6, 7,
+		          3, 2, 7,
+		
+		          7, 6, 2,
+		          7, 2, 3);
 		
 		model=VkModelUploader.upload(gpu, b);
 		
+		loadTexture();
+		
 		createSwapChain();
+		
+		window.show();
 		
 		fps.activate();
 		run();
@@ -115,62 +141,108 @@ public class VulkanRenderImpl{
 	
 	
 	private void loadTexture(){
-		//SugDude.jpg
-		BufferedImage img =null;
-		try{
-			img=ImageIO.read(dataManager.getInStream("textures/SmugDude.jpg"));
-			ByteBuffer    data=imgToBuff(img);
+		
+		try(MemoryStack stack=stackPush()){
+			
+			BufferedImage img      =ImageIO.read(dataManager.getInStream("textures/SmalSmugDude.png"));
+			int           imageSize=img.getWidth()*img.getHeight()*4;
+			
+			VkBufferMemory stagingMemory=gpu.createBufferMem(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			
+			try(VkBufferMemory.MemorySession buff=stagingMemory.requestMemory(gpu, stack)){
+				imgToBuff(buff.memory, img);
+			}
+			stagingMemory.flushMemory(gpu);
 			
 			
+			VkImageCreateInfo imageInfo=VkImageCreateInfo.callocStack(stack);
+			imageInfo.sType(VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO)
+			         .imageType(VK_IMAGE_TYPE_2D)
+			         .mipLevels(1)
+			         .arrayLayers(1)
+			         .format(VK_FORMAT_R8G8B8A8_UNORM)
+			         .tiling(VK_IMAGE_TILING_OPTIMAL)
+			         .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
+			         .usage(VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT)
+			         .sharingMode(VK_SHARING_MODE_EXCLUSIVE)
+			         .samples(VK_SAMPLE_COUNT_1_BIT);
 			
-			memFree(data);
+			imageInfo.extent().set(img.getWidth(), img.getHeight(), 1);
+			
+			
+			model.texture=gpu.createImageTexture(imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			
+			
+			model.texture.image.transitionImageLayout(gpu, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+			copyBufferToImage(stagingMemory.getBuffer(), model.texture.image);
+			model.texture.image.transitionImageLayout(gpu, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			
+			stagingMemory.destroy(gpu);
+			model.texture.init(gpu, VkImageAspect.COLOR);
+			
+			
 		}catch(IOException e){
 			e.printStackTrace();
 		}
 	}
 	
-	public static ByteBuffer imgToBuff(BufferedImage image){
-		
-		int[] pixels=new int[image.getWidth()*image.getHeight()];
-		image.getRGB(0, 0, image.getWidth(), image.getHeight(), pixels, 0, image.getWidth());
-		ByteBuffer buffer=memAlloc(image.getWidth()*image.getHeight()*image.getColorModel().getPixelSize()/8);
-		
+	private void copyBufferToImage(VkBuffer buffer, VkImage image){
+		try(MemoryStack stack=stackPush();SingleUseCommands commands=new SingleUseCommands(stack, gpu)){
+			
+			VkBufferImageCopy.Buffer region=VkBufferImageCopy.callocStack(1, stack);
+			region.get(0)
+			      .bufferOffset(0)
+			      .bufferRowLength(0)
+			      .bufferImageHeight(0)
+			      .imageOffset(VkOffset3D.callocStack(stack).set(0, 0, 0))
+			      .imageExtent(VkExtent3D.callocStack(stack).set(image.width, image.height, 1));
+			
+			region.get(0)
+			      .imageSubresource()
+			      .aspectMask(VK_IMAGE_ASPECT_COLOR_BIT)
+			      .mipLevel(0)
+			      .baseArrayLayer(0)
+			      .layerCount(1);
+			
+			vkCmdCopyBufferToImage(
+				commands.commandBuffer,
+				buffer.get(),
+				image.get(),
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				region);
+			
+		}
+	}
+	
+	
+	private static void imgToBuff(ByteBuffer buffer, BufferedImage image){
+
+//		int[] pixels=new int[image.getWidth()*image.getHeight()];
+//		image.getRGB(0, 0, image.getWidth(), image.getHeight(), pixels, 0, image.getWidth());
+		WritableRaster raster    =image.getRaster();
+		ColorModel     colorModel=image.getColorModel();
+		int[]          p         =new int[colorModel.getNumComponents()];
 		for(int y=0;y<image.getHeight();y++){
 			for(int x=0;x<image.getWidth();x++){
-				int pixel=pixels[y*image.getWidth()+x];
-				switch(image.getType()){
-				case TYPE_3BYTE_BGR:
-				case TYPE_INT_RGB:{
-					buffer.put((byte)(pixel>>16&0xFF)); // Red component
-					buffer.put((byte)(pixel>>8&0xFF)); // Green component
-					buffer.put((byte)(pixel&0xFF)); // Blue component
-				}
-				break;
-				case TYPE_4BYTE_ABGR:
-				case TYPE_INT_ARGB:{
-					buffer.put((byte)(pixel>>16&0xFF)); // Red component
-					buffer.put((byte)(pixel>>8&0xFF)); // Green component
-					buffer.put((byte)(pixel&0xFF)); // Blue component
-					buffer.put((byte)(pixel>>24&0xFF)); // Alpha component. Only for RGBA
-				}
-				break;
-				case TYPE_BYTE_GRAY:{
-					buffer.put((byte)pixel);
-				}
-				break;
-				case TYPE_USHORT_GRAY:{
-					buffer.putShort((short)pixel);
-				}
-				break;
-				default:
-					LogUtil.printlnEr(image.getType());
-					throw new IllegalStateException("Unknown type image format: "+image.getColorModel().toString());
-				}
+//				int pixel=pixels[y*image.getWidth()+x];
+//				int pixel=image.getRGB(x,y);
+//
+				raster.getPixel(x, y, p);
+//				buffer.put((byte)p[0]);
+//				buffer.put((byte)p[1]);
+//				buffer.put((byte)p[2]);
+//				buffer.put((byte)p[3]);
+				int r=p[0],
+					g=p[1],
+					b=p[2],
+					a=p.length>3?p[3]:1;
+				buffer.put((byte)r);
+				buffer.put((byte)g);
+				buffer.put((byte)b);
+				buffer.put((byte)a);
 			}
 		}
 		
-		buffer.flip();
-		return buffer;
 	}
 	
 	private void drawFrame(MemoryStack stack){
@@ -238,68 +310,71 @@ public class VulkanRenderImpl{
 		
 		swapChain=new VkSwapchain();
 		swapChain.create(gpu);
-		Vk.stack(this::createRenderPass);
+		createRenderPass();
 		
 		FileChageDetector.autoHandle(new File("res/shaders/test.vert"), ()->VkShaderCompiler.compileVertex("test.vert"));
 		FileChageDetector.autoHandle(new File("res/shaders/test.frag"), ()->VkShaderCompiler.compileFragment("test.frag"));
 		shader=new Shader("test");
-		shader.create(gpu, viewport, renderPass, new VkModelFormat(Vec3f.class, ColorM.class));
+		shader.create(gpu, viewport, renderPass, model);
 		
 		Vk.stack(s->swapChain.initFrameBuffers(s, renderPass));
 		Vk.stack(s->swapChain.initCommandBuffers(s, gpu.getGraphicsPool(), renderPass, shader, model, viewport));
 	}
 	
-	private void createRenderPass(MemoryStack stack){
-		VkAttachmentDescription.Buffer attachments=VkAttachmentDescription.mallocStack(1, stack);
-		attachments.get(0)
-		           .flags(0)
-		           .format(swapChain.getFormat())
-		           .samples(VK_SAMPLE_COUNT_1_BIT)
-		/*
-		VK_ATTACHMENT_LOAD_OP_LOAD: Preserve the existing contents of the attachment
-		VK_ATTACHMENT_LOAD_OP_CLEAR: Clear the values to a constant at the start
-		VK_ATTACHMENT_LOAD_OP_DONT_CARE: Existing contents are undefined; we don't care about them
-		
-		VK_ATTACHMENT_STORE_OP_STORE: Rendered contents will be stored in memory and can be read later
-		VK_ATTACHMENT_STORE_OP_DONT_CARE: Contents of the framebuffer will be undefined after the rendering
-		*/
-		           .loadOp(VK_ATTACHMENT_LOAD_OP_CLEAR)
-		           .storeOp(VK_ATTACHMENT_STORE_OP_STORE)
-		           .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
-		           .stencilStoreOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
-		/*
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL: Images used as color attachment
-		VK_IMAGE_LAYOUT_PRESENT_SRC_KHR: Images to be presented in the swap chain
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL: Images to be used as destination for a memory copy operation
-		 */
-		           .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
-		           .finalLayout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-		
-		
-		VkSubpassDescription.Buffer subpass=VkSubpassDescription.callocStack(1, stack);
-		subpass.pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
-		       .colorAttachmentCount(1)
-		       .pColorAttachments(
-			       VkAttachmentReference.mallocStack(1, stack)
-			                            .attachment(0)
-			                            .layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL))
-		       .pDepthStencilAttachment(null);
-		
-		VkRenderPassCreateInfo renderPassInfo=VkRenderPassCreateInfo.callocStack(stack);
-		renderPassInfo.sType(VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO)
-		              .pAttachments(attachments)
-		              .pSubpasses(subpass);
-		
-		VkSubpassDependency.Buffer dependency=VkSubpassDependency.mallocStack(1, stack);
-		dependency.srcSubpass(VK_SUBPASS_EXTERNAL);
-		dependency.dstSubpass(0);
-		dependency.srcStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-		dependency.srcAccessMask(0);
-		dependency.dstStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-		dependency.dstAccessMask(VK_ACCESS_COLOR_ATTACHMENT_READ_BIT|VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-		renderPassInfo.pDependencies(dependency);
-		
-		renderPass=Vk.createRenderPass(gpu.getDevice(), renderPassInfo, stack.mallocLong(1));
+	private void createRenderPass(){
+		try(MemoryStack stack=stackPush()){
+			
+			VkAttachmentDescription.Buffer attachments=VkAttachmentDescription.callocStack(2, stack);
+			attachments.get(0)
+			           .flags(0)
+			           .format(swapChain.getFormat())
+			           .samples(VK_SAMPLE_COUNT_1_BIT)
+			           .loadOp(VK_ATTACHMENT_LOAD_OP_CLEAR)
+			           .storeOp(VK_ATTACHMENT_STORE_OP_STORE)
+			           .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+			           .stencilStoreOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
+			           .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
+			           .finalLayout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+			attachments.get(1)
+			           .flags(0)
+			           .format(swapChain.getDepth().image.format)
+			           .samples(VK_SAMPLE_COUNT_1_BIT)
+			           .loadOp(VK_ATTACHMENT_LOAD_OP_CLEAR)
+			           .storeOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
+			           .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+			           .stencilStoreOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
+			           .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
+			           .finalLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+			
+			VkAttachmentReference depthAttachmentRef=VkAttachmentReference.callocStack(stack);
+			depthAttachmentRef.attachment(1)
+			                  .layout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+			
+			VkSubpassDescription.Buffer subpass=VkSubpassDescription.callocStack(1, stack);
+			subpass.pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
+			       .colorAttachmentCount(1)
+			       .pColorAttachments(
+				       VkAttachmentReference.mallocStack(1, stack)
+				                            .attachment(0)
+				                            .layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL))
+			       .pDepthStencilAttachment(depthAttachmentRef);
+			
+			VkSubpassDependency.Buffer dependency=VkSubpassDependency.mallocStack(1, stack);
+			dependency.srcSubpass(VK_SUBPASS_EXTERNAL)
+			          .dstSubpass(0)
+			          .srcStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+			          .srcAccessMask(0)
+			          .dstStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+			          .dstAccessMask(VK_ACCESS_COLOR_ATTACHMENT_READ_BIT|VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+			
+			VkRenderPassCreateInfo renderPassInfo=VkRenderPassCreateInfo.callocStack(stack);
+			renderPassInfo.sType(VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO)
+			              .pAttachments(attachments)
+			              .pSubpasses(subpass)
+			              .pDependencies(dependency);
+			
+			renderPass=Vk.createRenderPass(gpu.getDevice(), renderPassInfo, stack.mallocLong(1));
+		}
 	}
 	
 	private void initWindow(){
@@ -336,13 +411,15 @@ public class VulkanRenderImpl{
 		});
 		t.setDaemon(true);
 		t.start();
+		
+		Glfw.init();
+		
 		window.setSize(600, 400).setPos(-1, -1);
 		try{
 			winBufB.put(Files.readAllBytes(winFile.toPath()));
 			window.setSize(Math.max(winBuf.get(2), 100), Math.max(winBuf.get(3), 100)).setPos(winBuf.get(0), winBuf.get(1));
 		}catch(IOException e){}
 		
-		Glfw.init();
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		window.setResizeable(true).setTitle("Lapis Vulkan").init();
 		window.onResize(s->swapchainRecreationPending=true);
@@ -362,8 +439,9 @@ public class VulkanRenderImpl{
 		window.createSurface(instance);
 		
 		if(Vk.DEBUG) debugReport=new VkDebugReport(instance, stack.mallocLong(1), stack, (type, prefix, code, message)->{
-			if(type==VkDebugReport.Type.DEBUG) return;
-			if(type==VkDebugReport.Type.INFORMATION) return;
+//			if(type==VkDebugReport.Type.DEBUG) return;
+//			if(type==VkDebugReport.Type.INFORMATION) return;
+			if(message.startsWith("Device Extension")) return;
 			
 			List<String>  msgLin=TextUtil.wrapLongString(message, 100);
 			StringBuilder msg   =new StringBuilder().append(type).append(": [").append(prefix).append("] Code ").append(code).append(": ");
@@ -377,7 +455,7 @@ public class VulkanRenderImpl{
 	}
 	
 	private void pickDevice(){
-		try(MemoryStack stack=MemoryStack.stackPush()){
+		try(MemoryStack stack=stackPush()){
 			int deviceCount=Vk.enumeratePhysicalDevices(instance, stack.mallocInt(1));
 			if(deviceCount==0){
 				LogUtil.printlnEr("No devices support Vulkan API!\n"+
@@ -501,6 +579,8 @@ public class VulkanRenderImpl{
 	}
 	
 	private void destroy(){
+		window.hide();
+		
 		imageAvailableSemaphore.destroy(gpu);
 		renderFinishedSemaphore.destroy(gpu);
 		

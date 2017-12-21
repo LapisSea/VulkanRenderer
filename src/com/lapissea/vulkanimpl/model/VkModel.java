@@ -1,6 +1,7 @@
 package com.lapissea.vulkanimpl.model;
 
 import com.lapissea.vulkanimpl.VkGpu;
+import com.lapissea.vulkanimpl.VkImageTexture;
 import com.lapissea.vulkanimpl.VkModelFormat;
 
 public class VkModel{
@@ -10,8 +11,9 @@ public class VkModel{
 	private final VkBufferMemory memory;
 	private final int            vertexCount;
 	
-	private final int dataSize;
-	private final int indexFormat;
+	private final int            dataSize;
+	private final int            indexFormat;
+	public        VkImageTexture texture;
 	
 	
 	public VkModel(VkBufferMemory memory, VkModelFormat format, int dataSize, int indexFormat, int vertexCount){

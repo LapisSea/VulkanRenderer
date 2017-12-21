@@ -2,6 +2,7 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.vulkanimpl.model.VkBufferMemory;
 import com.lapissea.vulkanimpl.simplevktypes.*;
+import com.lapissea.vulkanimpl.util.VkImageAspect;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.lwjgl.PointerBuffer;
@@ -9,17 +10,59 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
-import javax.annotation.Nonnull;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 
 import static com.lapissea.vulkanimpl.BufferUtil.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkGpu{
+	
+	public enum Feature{
+		LINEAR(VK_IMAGE_TILING_LINEAR, f->f.linearTilingFeatures),
+		OPTIMAL(VK_IMAGE_TILING_OPTIMAL, f->f.optimalTilingFeatures);
+		
+		private final Function<PhysicalDeviceFormat, Integer> get;
+		
+		public final int tiling;
+		
+		Feature(int tiling, Function<PhysicalDeviceFormat, Integer> get){
+			this.tiling=tiling;
+			this.get=get;
+		}
+		
+		public int get(PhysicalDeviceFormat f){
+			return get.apply(f);
+		}
+	}
+	
+	private static class PhysicalDeviceFormat implements Comparable<PhysicalDeviceFormat>{
+		
+		public final int     format;
+		public final Integer linearTilingFeatures, optimalTilingFeatures, bufferFeatures;
+		
+		
+		public PhysicalDeviceFormat(int format){
+			this(format, 0, 0, 0);
+		}
+		
+		public PhysicalDeviceFormat(int format, int linearTilingFeatures, int optimalTilingFeatures, int bufferFeatures){
+			this.format=format;
+			this.linearTilingFeatures=linearTilingFeatures;
+			this.optimalTilingFeatures=optimalTilingFeatures;
+			this.bufferFeatures=bufferFeatures;
+		}
+		
+		@Override
+		public int compareTo(PhysicalDeviceFormat o){
+			return Integer.compare(format, o.format);
+		}
+	}
 	
 	public static final int QUEUE_FAIL=-1, QUEUE_NULL=-2;
 	
@@ -52,6 +95,8 @@ public class VkGpu{
 	
 	protected Collection<? extends CharSequence> deviceExtensions;
 	private   PointerBuffer                      layers;
+	
+	private final List<PhysicalDeviceFormat> phyDevFormats=new ArrayList<>();
 	
 	public VkGpu(GlfwWindow window, VkInstance instance, long pointer, Collection<? extends CharSequence> deviceExtensions, PointerBuffer layers){
 		this(window, new VkPhysicalDevice(pointer, instance), deviceExtensions, layers);
@@ -112,8 +157,7 @@ public class VkGpu{
 		return features;
 	}
 	
-	public @Nonnull
-	VkPhysicalDeviceProperties getProperties(){
+	public VkPhysicalDeviceProperties getProperties(){
 		if(properties==null){
 			properties=VkPhysicalDeviceProperties.calloc();
 			vkGetPhysicalDeviceProperties(physicalDevice, properties);
@@ -248,6 +292,7 @@ public class VkGpu{
 				}
 				
 				VkPhysicalDeviceFeatures deviceFeatures=VkPhysicalDeviceFeatures.callocStack(stack);
+				deviceFeatures.samplerAnisotropy(false);
 				//TODO
 				
 				VkDeviceCreateInfo deviceCreateInfo=VkDeviceCreateInfo.callocStack(stack);
@@ -314,7 +359,11 @@ public class VkGpu{
 	}
 	
 	public VkFence createFence(){
-		return Vk.createFence(getDevice());
+		try(MemoryStack stack=stackPush()){
+			VkFenceCreateInfo fenceInfo=VkFenceCreateInfo.callocStack(stack);
+			fenceInfo.sType(VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
+			return createFence(fenceInfo);
+		}
 	}
 	
 	public VkFence createFence(VkFenceCreateInfo fenceInfo){
@@ -339,9 +388,9 @@ public class VkGpu{
 		}
 	}
 	
-	public VkDeviceMemory alocateMem(VkMemoryAllocateInfo memAlloc){
+	public VkDeviceMemory alocateMem(long size, IMemoryAddressable context, int properties){
 		try(MemoryStack stack=stackPush()){
-			return Vk.allocateMemory(getDevice(), memAlloc, stack.mallocLong(1));
+			return alocateMem(size, context.getMemRequirements(this, stack), properties);
 		}
 	}
 	
@@ -351,8 +400,29 @@ public class VkGpu{
 			VkMemoryAllocateInfo memAlloc=VkMemoryAllocateInfo.callocStack(stack);
 			memAlloc.sType(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO)
 			        .allocationSize(Math.max(memRequ.size(), size))
-			        .memoryTypeIndex(Vk.findMemoryType(getMemoryProperties(), memRequ.memoryTypeBits(), properties));
+			        .memoryTypeIndex(findMemoryType(memRequ.memoryTypeBits(), properties));
 			
+			return Vk.allocateMemory(getDevice(), memAlloc, stack.mallocLong(1));
+		}
+	}
+	
+	private int findMemoryType(int typeBits, int properties){
+		VkPhysicalDeviceMemoryProperties deviceMemoryProperties=getMemoryProperties();
+		
+		int bits=typeBits;
+		for(int i=0;i<VK_MAX_MEMORY_TYPES;i++){
+			if((bits&1)==1){
+				if((deviceMemoryProperties.memoryTypes(i).propertyFlags()&properties)==properties){
+					return i;
+				}
+			}
+			bits>>=1;
+		}
+		throw new IllegalStateException("unable to find suitable memory type");
+	}
+	
+	public VkDeviceMemory alocateMem(VkMemoryAllocateInfo memAlloc){
+		try(MemoryStack stack=stackPush()){
 			return Vk.allocateMemory(getDevice(), memAlloc, stack.mallocLong(1));
 		}
 	}
@@ -360,15 +430,91 @@ public class VkGpu{
 	
 	public VkBufferMemory createBufferMem(int size, int usage, int properties){
 		
-		VkBuffer       buf=createBuffer(size, usage);
-		VkDeviceMemory mem;
+		VkBuffer buf=createBuffer(size, usage);
 		
-		try(MemoryStack stack=MemoryStack.stackPush()){
-			mem=alocateMem(size, buf.getMemRequirements(this, stack), properties);
-		}
-		
-		mem.bind(getDevice(), buf);
-		
-		return new VkBufferMemory(buf, mem, size);
+		return new VkBufferMemory(buf, buf.alocateMem(this, properties), size);
 	}
+	
+	public VkDescriptorPool createDescriptorPool(int maxSets){
+		try(MemoryStack stack=stackPush()){
+			
+			VkDescriptorPoolSize.Buffer poolSize=VkDescriptorPoolSize.callocStack(2, stack);
+			poolSize.get(0)
+			        .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+			        .descriptorCount(1);
+			poolSize.get(1)
+			        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+			        .descriptorCount(1);
+			
+			VkDescriptorPoolCreateInfo poolInfo=VkDescriptorPoolCreateInfo.callocStack(stack);
+			poolInfo.sType(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO)
+			        .pPoolSizes(poolSize)
+			        .maxSets(maxSets);
+			
+			return Vk.createDescriptorPool(getDevice(), poolInfo, stack);
+		}
+	}
+	
+	public VkImage createImage(VkImageCreateInfo imageInfo){
+		try(MemoryStack stack=stackPush()){
+			return Vk.createImage(getDevice(), imageInfo, stack.mallocLong(1));
+		}
+	}
+	
+	public VkImageTexture createImageTexture(VkImageCreateInfo imageInfo, int properties){
+		VkImage image=createImage(imageInfo);
+		return new VkImageTexture(image, image.alocateMem(this, properties), image.byteSize);
+	}
+	
+	
+	public boolean checkImageFormatSampling(Feature feature, int format){
+		return checkFormat(feature, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT, format);
+	}
+	
+	public int anyFormat(Feature feature, int requiredFeatures, int... formats){
+		for(int format : formats){
+			if(checkFormat(feature, requiredFeatures, format)) return format;
+		}
+		return -1;
+	}
+	
+	public boolean checkFormat(Feature feature, int requiredFeatures, int format){
+		PhysicalDeviceFormat d=null;
+		try{
+			d=phyDevFormats.get(Collections.binarySearch(phyDevFormats, new PhysicalDeviceFormat(format)));
+			if(d.format!=format) d=null;
+		}catch(Exception ignored){}
+		
+		if(d!=null) return (feature.get(d)&requiredFeatures)==requiredFeatures;
+		
+		
+		try(MemoryStack stack=stackPush()){
+			VkFormatProperties props=VkFormatProperties.mallocStack(stack);
+			vkGetPhysicalDeviceFormatProperties(physicalDevice, format, props);
+			phyDevFormats.add(new PhysicalDeviceFormat(format, props.linearTilingFeatures(), props.optimalTilingFeatures(), props.bufferFeatures()));
+			phyDevFormats.sort(null);
+		}
+		return checkFormat(feature, requiredFeatures, format);
+	}
+	
+	
+	public VkImageView createView(VkImage image, VkImageAspect aspect){
+		try(MemoryStack stack=stackPush()){
+			VkImageViewCreateInfo createInfo=VkImageViewCreateInfo.callocStack(stack);
+			createInfo.sType(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO)
+			          .image(image.get())
+			          .viewType(VK_IMAGE_VIEW_TYPE_2D)
+			          .format(image.format)
+			          .subresourceRange().set(aspect.val, 0, 1, 0, 1);
+			
+			VkComponentMapping comps=createInfo.components();
+			comps.r(VK_COMPONENT_SWIZZLE_IDENTITY)
+			     .g(VK_COMPONENT_SWIZZLE_IDENTITY)
+			     .b(VK_COMPONENT_SWIZZLE_IDENTITY)
+			     .a(VK_COMPONENT_SWIZZLE_IDENTITY);
+			
+			return Vk.createImageView(getDevice(), createInfo, stack.callocLong(1));
+		}
+	}
+	
 }

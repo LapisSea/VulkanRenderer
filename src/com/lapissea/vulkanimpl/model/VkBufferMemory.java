@@ -8,10 +8,8 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkMappedMemoryRange;
-import org.lwjgl.vulkan.VkMemoryRequirements;
 
 import java.nio.ByteBuffer;
-import java.util.function.Consumer;
 
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -90,29 +88,38 @@ public class VkBufferMemory{
 		Vk.invalidateMappedMemoryRanges(device, range);
 	}
 	
-	public void requestMemory(VkGpu gpu, MemoryStack stack, Consumer<ByteBuffer> consumer){
-		requestMemory(gpu.getDevice(), stack, consumer);
+	public class MemorySession implements AutoCloseable{
+		private final VkDevice   device;
+		public final  ByteBuffer memory;
+		
+		private MemorySession(VkDevice device, PointerBuffer dest, int offset, long byteSize){
+			this.device=device;
+			this.memory=mapMemory(device, dest, offset, byteSize).getByteBuffer(byteSize());
+		}
+		
+		@Override
+		public void close(){
+			unmapMemory(device);
+		}
 	}
 	
-	public void requestMemory(VkGpu gpu, PointerBuffer dest, Consumer<ByteBuffer> consumer){
-		requestMemory(gpu.getDevice(), dest, consumer);
+	public MemorySession requestMemory(VkGpu gpu, MemoryStack stack){
+		return requestMemory(gpu.getDevice(), stack);
 	}
 	
-	public void requestMemory(VkDevice device, MemoryStack stack, Consumer<ByteBuffer> consumer){
-		PointerBuffer pointer=mapMemory(device, stack);
-		consumer.accept(pointer.getByteBuffer(byteSize()));
-		unmapMemory(device);
+	public MemorySession requestMemory(VkGpu gpu, PointerBuffer dest){
+		return requestMemory(gpu.getDevice(), dest);
 	}
 	
-	public void requestMemory(VkDevice device, PointerBuffer dest, Consumer<ByteBuffer> consumer){
-		PointerBuffer pointer=mapMemory(device, dest);
-		consumer.accept(pointer.getByteBuffer(byteSize()));
-		unmapMemory(device);
+	public MemorySession requestMemory(VkDevice device, MemoryStack stack){
+		return requestMemory(device, stack.mallocPointer(1));
 	}
 	
-	public void requestMemory(VkDevice device, PointerBuffer dest, int offset, long byteSize, Consumer<ByteBuffer> consumer){
-		PointerBuffer pointer=mapMemory(device, dest, offset, byteSize);
-		consumer.accept(pointer.getByteBuffer(byteSize()));
-		unmapMemory(device);
+	public MemorySession requestMemory(VkDevice device, PointerBuffer dest){
+		return requestMemory(device, dest, 0, VK_WHOLE_SIZE);
+	}
+	
+	public MemorySession requestMemory(VkDevice device, PointerBuffer dest, int offset, long byteSize){
+		return new MemorySession(device, dest, offset, byteSize);
 	}
 }

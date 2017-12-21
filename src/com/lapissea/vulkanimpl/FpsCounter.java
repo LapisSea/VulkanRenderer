@@ -4,22 +4,30 @@ import gnu.trove.iterator.TLongIterator;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TLongArrayList;
 
+import java.util.function.LongSupplier;
+
 public class FpsCounter{
 	
 	private TLongList frames=new TLongArrayList(30);
 	private       boolean active;
 	private final int     second;
-	private final boolean useNano;
+	
+	private final LongSupplier tim;
 	
 	public FpsCounter(boolean useNano){
-		this.useNano=useNano;
-		second=useNano?1000_000_000:1000;
+		if(useNano){
+			second=1000_000_000;
+			tim=System::nanoTime;
+		}else{
+			second=1000;
+			tim=System::currentTimeMillis;
+		}
 	}
 	
 	public void newFrame(){
 		if(!active) return;
 		
-		long time=useNano?System.nanoTime():System.currentTimeMillis();
+		long time=tim.getAsLong();
 		
 		TLongIterator i=frames.iterator();
 		while(i.hasNext()){

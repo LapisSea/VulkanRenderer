@@ -6,6 +6,7 @@ import com.lapissea.vec.color.ColorM;
 import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.model.VkModel;
 import com.lapissea.vulkanimpl.simplevktypes.*;
+import com.lapissea.vulkanimpl.util.VkImageAspect;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
@@ -36,14 +37,18 @@ public class VkSwapchain{
 		return imageSize;
 	}
 	
+	public VkImageTexture getDepth(){
+		return depth;
+	}
+	
 	
 	public class Buffer{
-		private VkSwapchainImage image;
-		private VkImageView      view;
-		private VkCommandBuffer  cmd;
+		private VkImage         image;
+		private VkImageView     view;
+		private VkCommandBuffer cmd;
 		private boolean deleted=false;
 		
-		public Buffer(VkSwapchainImage image, VkImageView view){
+		public Buffer(VkImage image, VkImageView view){
 			this.image=image;
 			this.view=view;
 		}
@@ -61,7 +66,7 @@ public class VkSwapchain{
 			
 		}
 		
-		public VkSwapchainImage getImage(){
+		public VkImage getImage(){
 			check();
 			return image;
 		}
@@ -84,6 +89,7 @@ public class VkSwapchain{
 	private VkFramebuffer[] frameBuffers;
 	private boolean         destroyed;
 	private IVec2iR         imageSize;
+	private VkImageTexture  depth;
 	
 	private void check(){
 		if(destroyed) throw new IllegalStateException();
@@ -139,15 +145,22 @@ public class VkSwapchain{
 			id=Vk.createSwapchainKHR(device, swapchainInfo, stack.callocLong(1));
 			
 			IntBuffer ib=stack.callocInt(1);
-			imageCount=Vk.getSwapchainImagesKHR(device, id, ib);
+			imageCount=Vk.getSwapchainImagesKHR(device, this, ib);
 			
 			LongBuffer images=MemoryUtil.memAllocLong(imageCount);
-			Vk.getSwapchainImagesKHR(device, id, ib, images);
+			Vk.getSwapchainImagesKHR(device, this, ib, images);
 			
 			VkImageViewCreateInfo createInfo=VkImageViewCreateInfo.callocStack(stack);
 			createInfo.sType(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO)
 			          .viewType(VK_IMAGE_VIEW_TYPE_2D)
 			          .format(swapchainInfo.imageFormat());
+			
+			VkImageSubresourceRange subresourceRange=createInfo.subresourceRange();
+			subresourceRange.aspectMask(VK_IMAGE_ASPECT_COLOR_BIT)
+			                .baseMipLevel(0)
+			                .levelCount(1)
+			                .baseArrayLayer(0)
+			                .layerCount(1);
 			
 			VkComponentMapping comps=createInfo.components();
 			comps.r(VK_COMPONENT_SWIZZLE_IDENTITY)
@@ -157,18 +170,19 @@ public class VkSwapchain{
 			
 			
 			buffers=new Buffer[imageCount];
+			LongBuffer lb=stack.callocLong(1);
 			for(int i=0;i<buffers.length;i++){
-				VkImageSubresourceRange subresourceRange=createInfo.subresourceRange();
-				subresourceRange.aspectMask(VK_IMAGE_ASPECT_COLOR_BIT)
-				                .baseMipLevel(0)
-				                .levelCount(1)
-				                .baseArrayLayer(0)
-				                .layerCount(1);
-				
-				LongBuffer lb=stack.callocLong(1);
-				createInfo.image(images.get(i));
-				buffers[i]=new Buffer(new VkSwapchainImage(images.get(i)), Vk.createImageView(device, createInfo, lb));
+				long image=images.get(i);
+				createInfo.image(image);
+				buffers[i]=new Buffer(new VkImage(image, imageSize.x(), imageSize.y(), createInfo.format()), Vk.createImageView(device, createInfo, lb));
 			}
+			VkGpu.Feature feature    =VkGpu.Feature.OPTIMAL;
+			int           depthFormat=gpu.anyFormat(feature, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT);
+			if(depthFormat==-1) UtilL.exitWithErrorMsg("Unsupported depth format");
+			
+			depth=gpu.createImageTexture(Vk.imageCreateInfo(stack, imageSize.x(), imageSize.y(), depthFormat, feature, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT), VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			depth.image.transitionImageLayout(gpu, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			depth.init(gpu, VkImageAspect.DEPTH);
 		}
 	}
 	
@@ -208,7 +222,7 @@ public class VkSwapchain{
 			renderPassInfo.sType(VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO)
 			              .pNext(NULL)
 			              .renderPass(renderPass.get())
-			              .pClearValues(Vk.clearVal(new ColorM(0x2F91E0), VkClearValue.callocStack(1, stack)))
+			              .pClearValues(Vk.clearDepth(Vk.clearCol(new ColorM(0x2F91E0), VkClearValue.callocStack(1, stack))))
 			              .framebuffer(frameBuffers[i].get());
 			VkRect2D renderArea=renderPassInfo.renderArea();
 			renderArea.offset().set(0, 0);
@@ -238,16 +252,21 @@ public class VkSwapchain{
 	public void initFrameBuffers(MemoryStack stack, VkRenderPass renderPass){
 		check();
 		frameBuffers=new VkFramebuffer[buffers.length];
-		LongBuffer lb=stack.callocLong(1);
+		LongBuffer lb=stack.callocLong(2);
+		
+		VkFramebufferCreateInfo framebufferInfo=VkFramebufferCreateInfo.callocStack(stack);
+		framebufferInfo.sType(VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO)
+		               .renderPass(renderPass.get())
+		               .width(imageSize.x())
+		               .height(imageSize.y())
+		               .layers(1);
+		
+		lb.put(1, depth.getView().get());
 		
 		for(int i=0;i<getBufferCount();i++){
-			VkFramebufferCreateInfo framebufferInfo=VkFramebufferCreateInfo.callocStack(stack);
-			framebufferInfo.sType(VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO)
-			               .renderPass(renderPass.get())
-			               .width(imageSize.x())
-			               .height(imageSize.y())
-			               .layers(1)
-			               .pAttachments(lb.put(0, buffers[i].getView().get()));
+			
+			framebufferInfo.pAttachments(lb.put(0, buffers[i].getView().get()));
+			
 			frameBuffers[i]=Vk.createFrameBuffer(device, framebufferInfo, stack.callocLong(1));
 		}
 		
@@ -255,6 +274,7 @@ public class VkSwapchain{
 	
 	public void destroy(){
 		check();
+		depth.destroy(device);
 		UtilL.forEach(frameBuffers, t->t.destroy(device));
 		frameBuffers=null;
 		
@@ -262,7 +282,7 @@ public class VkSwapchain{
 			for(Buffer b : buffers) b.destroy(device);
 			buffers=null;
 		}
-		Vk.destroySwapchainKHR(device, id);
+		Vk.destroySwapchainKHR(device, this);
 		device=null;
 		
 		destroyed=true;
@@ -286,7 +306,7 @@ public class VkSwapchain{
 			VkSurfaceFormatKHR format=availableFormats.get(i);
 			
 			int f=format.format();
-			if((f==VK_FORMAT_B8G8R8A8_UNORM||f==VK_FORMAT_UNDEFINED)&&format.colorSpace()==KHRSurface.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) return format;
+			if((f==VK_FORMAT_B8G8R8A8_UNORM||f==VK_FORMAT_UNDEFINED)&&format.colorSpace()==VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) return format;
 		}
 		
 		return availableFormats.get(0);
@@ -305,9 +325,9 @@ public class VkSwapchain{
 		int[] ids=new int[availablePresentModes.capacity()];
 		for(int i=0;i<availablePresentModes.capacity();i++) ids[i]=availablePresentModes.get(i);
 
-//		if(UtilL.contains(ids, KHRSurface.VK_PRESENT_MODE_MAILBOX_KHR)) return KHRSurface.VK_PRESENT_MODE_MAILBOX_KHR;//triple buffering
-		if(UtilL.contains(ids, KHRSurface.VK_PRESENT_MODE_FIFO_KHR)) return KHRSurface.VK_PRESENT_MODE_FIFO_KHR;//v-sync
-		return KHRSurface.VK_PRESENT_MODE_IMMEDIATE_KHR;//tearing
+//		if(UtilL.contains(ids, VK_PRESENT_MODE_MAILBOX_KHR)) return KHRSurface.VK_PRESENT_MODE_MAILBOX_KHR;//triple buffering
+		if(UtilL.contains(ids, VK_PRESENT_MODE_FIFO_KHR)) return VK_PRESENT_MODE_FIFO_KHR;//v-sync
+		return VK_PRESENT_MODE_IMMEDIATE_KHR;//tearing
 	}
 	
 	public long getId(){

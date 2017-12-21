@@ -45,6 +45,7 @@ public class GlfwWindow{
 	public void init(){
 		IVec2iR s=getSize();
 		glfwWindowHint(GLFW_RESIZABLE, resizeable?GLFW_TRUE:GLFW_FALSE);
+//		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 		id=glfwCreateWindow(s.x(), s.y(), getTitle(), MemoryUtil.NULL, MemoryUtil.NULL);
 		setWindowPos(pos);
 		
@@ -241,5 +242,13 @@ public class GlfwWindow{
 	
 	public void onResize(Consumer<IVec2iR> onResize){
 		this.onResize=onResize;
+	}
+	
+	public void hide(){
+		glfwHideWindow(id);
+	}
+	
+	public void show(){
+		glfwShowWindow(id);
 	}
 }

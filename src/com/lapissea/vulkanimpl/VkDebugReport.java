@@ -6,6 +6,9 @@ import org.lwjgl.vulkan.*;
 
 import java.nio.LongBuffer;
 
+import static org.lwjgl.system.MemoryUtil.*;
+import static org.lwjgl.vulkan.EXTDebugReport.*;
+
 public class VkDebugReport{
 	/*
 		if((flags&EXTDebugReport.VK_DEBUG_REPORT_INFORMATION_BIT_EXT)!=0) type="INFORMATION";
@@ -65,15 +68,15 @@ public class VkDebugReport{
 	}
 	
 	public VkDebugReport(VkInstance instance, LongBuffer lb, MemoryStack stack, VkDebugReportCallbackEXTI hook){
-		this(instance, lb, VkDebugReportCallbackCreateInfoEXT.mallocStack(stack).sType(EXTDebugReport.VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT)
-		                                                     .pNext(MemoryUtil.NULL)
-		                                                     .flags(EXTDebugReport.VK_DEBUG_REPORT_INFORMATION_BIT_EXT|
-		                                                            EXTDebugReport.VK_DEBUG_REPORT_WARNING_BIT_EXT|
-		                                                            EXTDebugReport.VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT|
-		                                                            EXTDebugReport.VK_DEBUG_REPORT_ERROR_BIT_EXT|
-		                                                            EXTDebugReport.VK_DEBUG_REPORT_DEBUG_BIT_EXT)
+		this(instance, lb, VkDebugReportCallbackCreateInfoEXT.mallocStack(stack).sType(VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT)
+		                                                     .pNext(NULL)
+		                                                     .flags(VK_DEBUG_REPORT_INFORMATION_BIT_EXT|
+		                                                            VK_DEBUG_REPORT_WARNING_BIT_EXT|
+		                                                            VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT|
+		                                                            VK_DEBUG_REPORT_ERROR_BIT_EXT|
+		                                                            VK_DEBUG_REPORT_DEBUG_BIT_EXT)
 		                                                     .pfnCallback(VkDebugReportCallbackEXT.create(hook))
-		                                                     .pUserData(MemoryUtil.NULL));
+		                                                     .pUserData(NULL));
 	}
 	
 	public VkDebugReport(VkInstance instance, LongBuffer lb, VkDebugReportCallbackCreateInfoEXT createInfo){

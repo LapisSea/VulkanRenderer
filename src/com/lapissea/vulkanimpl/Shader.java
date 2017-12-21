@@ -3,6 +3,7 @@ package com.lapissea.vulkanimpl;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.model.BufferBuilder;
 import com.lapissea.vulkanimpl.model.VkBufferMemory;
+import com.lapissea.vulkanimpl.model.VkModel;
 import com.lapissea.vulkanimpl.simplevktypes.*;
 import org.joml.Matrix4f;
 import org.lwjgl.PointerBuffer;
@@ -49,7 +50,9 @@ public class Shader{
 	
 	public Shader(String name){this.name=name;}
 	
-	public void create(VkGpu gpu, VkViewport.Buffer viewport, VkRenderPass renderPass, VkModelFormat format){
+	public void create(VkGpu gpu, VkViewport.Buffer viewport, VkRenderPass renderPass, VkModel model){
+		
+		VkModelFormat format=model.getFormat();
 		
 		this.viewport=viewport;
 		
@@ -119,35 +122,42 @@ public class Shader{
 			dynamicState.pDynamicStates(BufferUtil.of(stack, VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_LINE_WIDTH, VK_DYNAMIC_STATE_SCISSOR).flip());
 			
 			
-			VkDescriptorSetLayoutBinding.Buffer uboLayoutBinding=VkDescriptorSetLayoutBinding.callocStack(1, stack);
-			uboLayoutBinding.get(0)
-			                .binding(0)
-			                .descriptorType(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-			                .descriptorCount(1)
-			                .stageFlags(VK_SHADER_STAGE_VERTEX_BIT);
+			VkDescriptorSetLayoutBinding.Buffer uboLayoutBindings=VkDescriptorSetLayoutBinding.callocStack(2, stack);
+			uboLayoutBindings.get(0)
+			                 .binding(0)
+			                 .descriptorCount(1)
+			                 .descriptorType(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+			                 .stageFlags(VK_SHADER_STAGE_VERTEX_BIT);
+			uboLayoutBindings.get(1)
+			                 .binding(1)
+			                 .descriptorCount(1)
+			                 .descriptorType(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+			                 .stageFlags(VK_SHADER_STAGE_FRAGMENT_BIT);
 			
 			descriptorSetLayout=VkDescriptorSetLayoutCreateInfo.calloc();
 			descriptorSetLayout.sType(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO)
-			                   .pBindings(uboLayoutBinding);
+			                   .pBindings(uboLayoutBindings);
 			
 			layout=Vk.createDescriptorSetLayout(gpu.getDevice(), descriptorSetLayout, stack);
 			
 			
-			VkPipelineLayoutCreateInfo pipelineLayoutInfo=VkPipelineLayoutCreateInfo.callocStack(stack);
-			pipelineLayoutInfo.pNext(0)
-			                  .sType(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
-			                  .pPushConstantRanges(null)
-			                  .pSetLayouts(buffSingle(stack, layout));
+			VkPipelineLayoutCreateInfo layoutInfo=VkPipelineLayoutCreateInfo.callocStack(stack);
+			layoutInfo.pNext(0)
+			          .sType(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
+			          .pPushConstantRanges(null)
+			          .pSetLayouts(buffSingle(stack, layout));
 			
-			pipelineLayout=Vk.createPipelineLayout(gpu.getDevice(), pipelineLayoutInfo, stack.callocLong(1));
+			pipelineLayout=Vk.createPipelineLayout(gpu.getDevice(), layoutInfo, stack.callocLong(1));
 			
 			VkPipelineDepthStencilStateCreateInfo depthStencilState=VkPipelineDepthStencilStateCreateInfo.callocStack(stack);
 			depthStencilState.sType(VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO)
-			                 .depthTestEnable(false)
+			                 .depthTestEnable(true)
 			                 .depthWriteEnable(false)
-			                 .depthCompareOp(VK_COMPARE_OP_ALWAYS)
+			                 .depthCompareOp(VK_COMPARE_OP_LESS)
 			                 .depthBoundsTestEnable(false)
-			                 .stencilTestEnable(false);
+			                 .stencilTestEnable(false)
+			                 .minDepthBounds(0)
+			                 .maxDepthBounds(1);
 			
 			depthStencilState.back()
 			                 .failOp(VK_STENCIL_OP_KEEP)
@@ -233,7 +243,7 @@ public class Shader{
 			uniformPoint=memAllocPointer(1);
 			gpu.waitIdle();
 			
-			initUniforms();
+			initUniforms(model);
 			uploadUniforms();
 			
 		}catch(Exception e){
@@ -241,7 +251,7 @@ public class Shader{
 		}
 	}
 	
-	public void initUniforms(){
+	public void initUniforms(VkModel model){
 		int uniSiz;
 		
 		uniSiz=Float.SIZE*16*3+Float.SIZE;
@@ -250,15 +260,7 @@ public class Shader{
 		
 		try(MemoryStack stack=MemoryStack.stackPush()){
 			
-			VkDescriptorPoolSize.Buffer poolSize=VkDescriptorPoolSize.callocStack(1, stack);
-			poolSize.get(0)
-			        .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-			        .descriptorCount(1);
-			VkDescriptorPoolCreateInfo poolInfo=VkDescriptorPoolCreateInfo.callocStack(stack);
-			poolInfo.sType(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO)
-			        .pPoolSizes(poolSize)
-			        .maxSets(1);
-			descriptorPool=Vk.createDescriptorPool(gpu.getDevice(), poolInfo, stack);
+			descriptorPool=gpu.createDescriptorPool(1);
 			
 			
 			descriptorSet=Vk.allocateDescriptorSets(gpu.getDevice(), VkDescriptorSetAllocateInfo.callocStack(stack)
@@ -266,19 +268,33 @@ public class Shader{
 			                                                                                    .descriptorPool(descriptorPool.get())
 			                                                                                    .pSetLayouts(buffSingle(stack, layout)), stack);
 			
-			VkDescriptorBufferInfo.Buffer descriptor=VkDescriptorBufferInfo.callocStack(1, stack);
-			descriptor.get(0)
+			VkDescriptorBufferInfo.Buffer bufferInfo=VkDescriptorBufferInfo.callocStack(1, stack);
+			bufferInfo.get(0)
 			          .buffer(uniformBuffer.getBuffer().get())
 			          .offset(0)
 			          .range(uniformBuffer.byteSize());
 			
-			VkWriteDescriptorSet.Buffer descriptorWrite=VkWriteDescriptorSet.callocStack(1, stack);
+			VkDescriptorImageInfo.Buffer imageInfo=VkDescriptorImageInfo.callocStack(1, stack);
+			imageInfo.get(0)
+			         .imageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+			         .imageView(model.texture.getView().get())
+			         .sampler(model.texture.getSampler().get());
+			
+			VkWriteDescriptorSet.Buffer descriptorWrite=VkWriteDescriptorSet.callocStack(2, stack);
 			descriptorWrite.get(0)
 			               .sType(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET)
 			               .dstSet(descriptorSet.get())
 			               .descriptorType(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-			               .pBufferInfo(descriptor)
-			               .dstBinding(0);
+			               .pBufferInfo(bufferInfo)
+			               .dstBinding(0)
+			               .dstArrayElement(0);
+			descriptorWrite.get(1)
+			               .sType(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET)
+			               .dstSet(descriptorSet.get())
+			               .descriptorType(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+			               .pImageInfo(imageInfo)
+			               .dstBinding(0)
+			               .dstArrayElement(0);
 			
 			
 			vkUpdateDescriptorSets(gpu.getDevice(), descriptorWrite, null);
@@ -294,18 +310,19 @@ public class Shader{
 
 //		view.rotate((float)Math.cos((tim)%(Math.PI*2))/3, 0, 1, 0);
 //		view.rotate((float)Math.cos((tim*2)%(Math.PI*2))/3, 1, 1, 0);
-		view.translate(0, 0, -0.5F);
+		view.translate(0, 0, -1F);
+		view.rotate(1, 0, 0, 0);
 		
-		model.rotate((float)((tim/3)%(Math.PI*2)), 0, 0, 1);
+		model.rotate((float)((tim/2)%(Math.PI*2)), 1, 0, 0);
 		
 		proj.perspective(90, viewport.width()/viewport.height(), 0.001F, 1000, false);
 		
-		uniformBuffer.requestMemory(gpu, uniformPoint.rewind(), buff->{
-			BufferBuilder.put(buff, model);
-			BufferBuilder.put(buff, view);
-			BufferBuilder.put(buff, proj);
-			BufferBuilder.put(buff, (float)((tim*20)%(Math.PI*2)));
-		});
+		try(VkBufferMemory.MemorySession ses=uniformBuffer.requestMemory(gpu, uniformPoint.rewind())){
+			BufferBuilder.put(ses.memory, model);
+			BufferBuilder.put(ses.memory, view);
+			BufferBuilder.put(ses.memory, proj);
+			BufferBuilder.put(ses.memory, (float)((tim*20)%(Math.PI*2)));
+		}
 	}
 	
 	public void destroy(){
