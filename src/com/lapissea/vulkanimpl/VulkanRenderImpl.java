@@ -149,7 +149,7 @@ public class VulkanRenderImpl{
 			
 			VkBufferMemory stagingMemory=gpu.createBufferMem(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			
-			try(VkBufferMemory.MemorySession buff=stagingMemory.requestMemory(gpu, stack)){
+			try(VkBufferMemory.MemorySession buff=stagingMemory.requestMemory(gpu)){
 				imgToBuff(buff.memory, img);
 			}
 			stagingMemory.flushMemory(gpu);
@@ -346,10 +346,6 @@ public class VulkanRenderImpl{
 			           .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
 			           .finalLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 			
-			VkAttachmentReference depthAttachmentRef=VkAttachmentReference.callocStack(stack);
-			depthAttachmentRef.attachment(1)
-			                  .layout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-			
 			VkSubpassDescription.Buffer subpass=VkSubpassDescription.callocStack(1, stack);
 			subpass.pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
 			       .colorAttachmentCount(1)
@@ -357,7 +353,10 @@ public class VulkanRenderImpl{
 				       VkAttachmentReference.mallocStack(1, stack)
 				                            .attachment(0)
 				                            .layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL))
-			       .pDepthStencilAttachment(depthAttachmentRef);
+			       .pDepthStencilAttachment(
+				       VkAttachmentReference.callocStack(stack)
+				                            .attachment(1)
+				                            .layout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL));
 			
 			VkSubpassDependency.Buffer dependency=VkSubpassDependency.mallocStack(1, stack);
 			dependency.srcSubpass(VK_SUBPASS_EXTERNAL)

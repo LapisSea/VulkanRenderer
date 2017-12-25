@@ -43,7 +43,6 @@ public class Shader{
 	private VkDescriptorSetLayoutCreateInfo descriptorSetLayout;
 	private VkDescriptorSetLayout           layout;
 	private VkBufferMemory                  uniformBuffer;
-	private PointerBuffer                   uniformPoint;
 	private VkDescriptorPool                descriptorPool;
 	private VkDescriptorSet                 descriptorSet;
 	private VkViewport.Buffer               viewport;
@@ -239,8 +238,6 @@ public class Shader{
 			;
 			
 			graphicsPipeline=Vk.createGraphicsPipelines(gpu.getDevice(), pipelineInfo, stack.callocLong(1))[0];
-			
-			uniformPoint=memAllocPointer(1);
 			gpu.waitIdle();
 			
 			initUniforms(model);
@@ -317,7 +314,7 @@ public class Shader{
 		
 		proj.perspective(90, viewport.width()/viewport.height(), 0.001F, 1000, false);
 		
-		try(VkBufferMemory.MemorySession ses=uniformBuffer.requestMemory(gpu, uniformPoint.rewind())){
+		try(VkBufferMemory.MemorySession ses=uniformBuffer.requestMemory(gpu)){
 			BufferBuilder.put(ses.memory, model);
 			BufferBuilder.put(ses.memory, view);
 			BufferBuilder.put(ses.memory, proj);
@@ -327,7 +324,6 @@ public class Shader{
 	
 	public void destroy(){
 		descriptorPool.destroy(gpu);
-		memFree(uniformPoint);
 		descriptorSetLayout.free();
 		layout.destroy(gpu);
 		if(fs!=null){

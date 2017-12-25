@@ -472,7 +472,7 @@ public class Vk{
 		return dest;
 	}
 	public static VkClearValue.Buffer clearDepth(VkClearValue.Buffer dest){
-		dest.depthStencil().depth(1).stencil(0);
+//		dest.depthStencil().depth(1).stencil(0);
 		return dest;
 	}
 	

@@ -11,6 +11,7 @@ import org.lwjgl.vulkan.VkMappedMemoryRange;
 
 import java.nio.ByteBuffer;
 
+import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkBufferMemory{
@@ -91,35 +92,29 @@ public class VkBufferMemory{
 	public class MemorySession implements AutoCloseable{
 		private final VkDevice   device;
 		public final  ByteBuffer memory;
+		private final PointerBuffer pointer=memAllocPointer(1);
 		
-		private MemorySession(VkDevice device, PointerBuffer dest, int offset, long byteSize){
+		private MemorySession(VkDevice device, int offset, long byteSize){
 			this.device=device;
-			this.memory=mapMemory(device, dest, offset, byteSize).getByteBuffer(byteSize());
+			this.memory=mapMemory(device, pointer, offset, byteSize).getByteBuffer(byteSize());
 		}
 		
 		@Override
 		public void close(){
 			unmapMemory(device);
+			memFree(pointer);
 		}
 	}
 	
-	public MemorySession requestMemory(VkGpu gpu, MemoryStack stack){
-		return requestMemory(gpu.getDevice(), stack);
+	public MemorySession requestMemory(VkGpu gpu){
+		return requestMemory(gpu.getDevice());
 	}
 	
-	public MemorySession requestMemory(VkGpu gpu, PointerBuffer dest){
-		return requestMemory(gpu.getDevice(), dest);
+	public MemorySession requestMemory(VkDevice device){
+		return requestMemory(device, 0, VK_WHOLE_SIZE);
 	}
 	
-	public MemorySession requestMemory(VkDevice device, MemoryStack stack){
-		return requestMemory(device, stack.mallocPointer(1));
-	}
-	
-	public MemorySession requestMemory(VkDevice device, PointerBuffer dest){
-		return requestMemory(device, dest, 0, VK_WHOLE_SIZE);
-	}
-	
-	public MemorySession requestMemory(VkDevice device, PointerBuffer dest, int offset, long byteSize){
-		return new MemorySession(device, dest, offset, byteSize);
+	public MemorySession requestMemory(VkDevice device, int offset, long byteSize){
+		return new MemorySession(device, offset, byteSize);
 	}
 }
