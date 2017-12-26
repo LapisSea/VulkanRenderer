@@ -48,20 +48,21 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public class VulkanRenderImpl{
 	
-	private final ByteBuffer winBufB=ByteBuffer.allocate(4*4+1);
-	private final IntBuffer  winBuf =winBufB.asIntBuffer();
-	private final File       winFile=new File("winData.bin");
-	
 	public static void main(String[] args){
 		System.setProperty("joml.nounsafe", "true");
 		
 		TextUtil.__REGISTER_CUSTOM_TO_STRING(VkExtent2D.class, e->e.getClass().getName()+"{h="+e.height()+", w="+e.height()+"}");
-		LogUtil.__.INIT(true, false, "log");
+		LogUtil.__.INIT(true, false, null);
 		LogUtil.println("STARTED at "+Date.from(Instant.now()));
 		LogUtil.printlnEr("STARTED at "+Date.from(Instant.now()), "\"xD \" ");
 		
 		new VulkanRenderImpl();
 	}
+	
+	
+	private final ByteBuffer winBufB=ByteBuffer.allocate(4*4+1);
+	private final IntBuffer  winBuf =winBufB.asIntBuffer();
+	private final File       winFile=new File("winData.bin");
 	
 	private GlfwWindow window=new GlfwWindow();
 	
@@ -72,8 +73,8 @@ public class VulkanRenderImpl{
 	private Shader        shader;
 	private VkRenderPass  renderPass;
 	
-	private PointerBuffer layers          =null;
-	private List<String>  deviceExtensions=new ArrayList<>(List.of(KHRSwapchain.VK_KHR_SWAPCHAIN_EXTENSION_NAME));
+	private PointerBuffer layers;
+	private List<String>  deviceExtensions=new ArrayList<>(List.of(VK_KHR_SWAPCHAIN_EXTENSION_NAME));
 	
 	private boolean swapchainRecreationPending=false;
 	
@@ -120,10 +121,7 @@ public class VulkanRenderImpl{
 		          5, 1, 4,
 		
 		          2, 6, 7,
-		          3, 2, 7,
-		
-		          7, 6, 2,
-		          7, 2, 3);
+		          3, 2, 7);
 		
 		model=VkModelUploader.upload(gpu, b);
 		
