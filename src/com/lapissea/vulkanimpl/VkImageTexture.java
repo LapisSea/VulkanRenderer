@@ -46,7 +46,7 @@ public class VkImageTexture{
 			           .minLod(0)
 			           .maxLod(0);
 			
-			sampler=Vk.createSampler(gpu.getDevice(), samplerInfo, stack.mallocLong(1));
+			sampler=Vk.createSampler(gpu, samplerInfo, stack.mallocLong(1));
 		}
 		
 	}
@@ -55,17 +55,13 @@ public class VkImageTexture{
 		return view;
 	}
 	
-	public void destroy(VkGpu gpu){
-		destroy(gpu.getDevice());
-	}
-	
-	public void destroy(VkDevice device){
+	public void destroy(){
 		if(view!=null){
-			sampler.destroy(device);
-			view.destroy(device);
+			sampler.destroy();
+			view.destroy();
 		}
-		image.destroy(device);
-		memory.destroy(device);
+		image.destroy();
+		memory.destroy();
 		view=null;
 	}
 	

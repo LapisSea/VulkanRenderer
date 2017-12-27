@@ -7,6 +7,8 @@ import com.lapissea.vec.color.ColorM;
 import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.model.VkModel;
 import com.lapissea.vulkanimpl.simplevktypes.*;
+import com.lapissea.vulkanimpl.util.VkDestroyable;
+import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import com.lapissea.vulkanimpl.util.VkImageAspect;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -23,24 +25,7 @@ import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
 
-public class VkSwapchain{
-	
-	
-	public VkDevice getDevice(){
-		return device;
-	}
-	
-	public int getFormat(){
-		return format;
-	}
-	
-	public IVec2iR getImageSize(){
-		return imageSize;
-	}
-	
-	public VkImageTexture getDepth(){
-		return depth;
-	}
+public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	
 	
 	public class Buffer{
@@ -58,9 +43,9 @@ public class VkSwapchain{
 			if(deleted) throw new IllegalStateException();
 		}
 		
-		public void destroy(VkDevice device){
+		public void destroy(){
 			check();
-			view.destroy(device);
+			view.destroy();
 			view=null;
 			cmd=null;
 			deleted=true;
@@ -85,7 +70,7 @@ public class VkSwapchain{
 	
 	private long            id;
 	private Buffer[]        buffers;
-	private VkDevice        device;
+	private VkGpu           gpu;
 	private int             format;
 	private VkFramebuffer[] frameBuffers;
 	private boolean         destroyed;
@@ -98,6 +83,8 @@ public class VkSwapchain{
 	
 	public void create(VkGpu gpu){
 		check();
+		if(Vk.DEBUG) Objects.requireNonNull(gpu);
+		this.gpu=gpu;
 		
 		VkSurfaceCapabilitiesKHR caps       =gpu.getSurfaceCapabilities();
 		VkSurfaceFormatKHR       format     =chooseSwapSurfaceFormat(gpu.getFormats());
@@ -140,7 +127,7 @@ public class VkSwapchain{
 				swapchainInfo.pQueueFamilyIndices(null);
 			}
 			
-			this.device=gpu.getDevice();
+			VkDevice device=gpu.getDevice();
 			this.format=swapchainInfo.imageFormat();
 			
 			id=Vk.createSwapchainKHR(device, swapchainInfo, stack.callocLong(1));
@@ -175,7 +162,7 @@ public class VkSwapchain{
 			for(int i=0;i<buffers.length;i++){
 				long image=images.get(i);
 				createInfo.image(image);
-				buffers[i]=new Buffer(new VkImage(image, imageSize.x(), imageSize.y(), createInfo.format()), Vk.createImageView(device, createInfo, lb));
+				buffers[i]=new Buffer(new VkImage(gpu, image, imageSize.x(), imageSize.y(), createInfo.format()), Vk.createImageView(this, createInfo, lb));
 			}
 			VkGpu.Feature feature    =VkGpu.Feature.OPTIMAL;
 			int           depthFormat=gpu.anyFormat(feature, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT);
@@ -183,8 +170,8 @@ public class VkSwapchain{
 //			LogUtil.println(depthFormat);
 //			System.exit(0);
 			depth=gpu.createImageTexture(Vk.imageCreateInfo(stack, imageSize.x(), imageSize.y(), depthFormat, feature, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT), VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-			depth.image.transitionImageLayout(gpu, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			depth.init(gpu, VkImageAspect.DEPTH);
+			depth.image.transitionImageLayout(gpu, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		}
 	}
 	
@@ -209,7 +196,7 @@ public class VkSwapchain{
 			         .level(VK_COMMAND_BUFFER_LEVEL_PRIMARY)
 			         .commandBufferCount(1);
 			
-			buffers[i].cmd=Vk.allocateCommandBuffers(device, allocInfo, stack.callocPointer(1))[0];
+			buffers[i].cmd=Vk.allocateCommandBuffers(getGpuDevice(), allocInfo, stack.callocPointer(1))[0];
 			
 			VkCommandBufferBeginInfo beginInfo=VkCommandBufferBeginInfo.callocStack(stack);
 			beginInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO)
@@ -254,38 +241,35 @@ public class VkSwapchain{
 	public void initFrameBuffers(MemoryStack stack, VkRenderPass renderPass){
 		check();
 		frameBuffers=new VkFramebuffer[buffers.length];
-		LongBuffer lb=stack.callocLong(2);
-		
-		VkFramebufferCreateInfo framebufferInfo=VkFramebufferCreateInfo.callocStack(stack);
-		framebufferInfo.sType(VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO)
-		               .renderPass(renderPass.get())
-		               .width(imageSize.x())
-		               .height(imageSize.y())
-		               .layers(1);
-		
-		lb.put(1, depth.getView().get());
 		
 		for(int i=0;i<getBufferCount();i++){
+			LongBuffer lb=stack.callocLong(2);
 			
-			framebufferInfo.pAttachments(lb.put(0, buffers[i].getView().get()));
+			VkFramebufferCreateInfo framebufferInfo=VkFramebufferCreateInfo.callocStack(stack);
+			framebufferInfo.sType(VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO)
+			               .renderPass(renderPass.get())
+			               .width(imageSize.x())
+			               .height(imageSize.y())
+			               .layers(1);
+			framebufferInfo.pAttachments(stack.longs(buffers[i].getView().get(), depth.getView().get()));
 			
-			frameBuffers[i]=Vk.createFrameBuffer(device, framebufferInfo, stack.callocLong(1));
+			frameBuffers[i]=Vk.createFrameBuffer(this, framebufferInfo, stack.callocLong(1));
 		}
 		
 	}
 	
+	@Override
 	public void destroy(){
 		check();
-		depth.destroy(device);
-		UtilL.forEach(frameBuffers, t->t.destroy(device));
+		depth.destroy();
+		UtilL.forEach(frameBuffers, VkFramebuffer::destroy);
 		frameBuffers=null;
 		
 		if(buffers!=null){
-			for(Buffer b : buffers) b.destroy(device);
+			for(Buffer b : buffers) b.destroy();
 			buffers=null;
 		}
-		Vk.destroySwapchainKHR(device, this);
-		device=null;
+		Vk.destroySwapchainKHR(getGpuDevice(), this);
 		
 		destroyed=true;
 	}
@@ -335,5 +319,24 @@ public class VkSwapchain{
 	public long getId(){
 		check();
 		return id;
+	}
+	
+	
+	public int getFormat(){
+		return format;
+	}
+	
+	public IVec2iR getImageSize(){
+		return imageSize;
+	}
+	
+	public VkImageTexture getDepth(){
+		return depth;
+	}
+	
+	
+	@Override
+	public VkGpu getGpu(){
+		return gpu;
 	}
 }

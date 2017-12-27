@@ -1,10 +1,14 @@
 package com.lapissea.vulkanimpl.model;
 
+import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.VkImageTexture;
 import com.lapissea.vulkanimpl.VkModelFormat;
+import com.lapissea.vulkanimpl.util.VkDestroyable;
 
-public class VkModel{
+import java.util.Objects;
+
+public class VkModel implements VkDestroyable{
 	
 	private final VkModelFormat format;
 	
@@ -24,12 +28,12 @@ public class VkModel{
 		
 		this.dataSize=dataSize;
 		this.indexFormat=indexFormat;
-		
 	}
 	
 	
-	public void destroy(VkGpu gpu){
-		memory.destroy(gpu);
+	@Override
+	public void destroy(){
+		memory.destroy();
 	}
 	
 	public int getVertexCount(){

@@ -52,9 +52,9 @@ public class VulkanRenderImpl{
 		System.setProperty("joml.nounsafe", "true");
 		
 		TextUtil.__REGISTER_CUSTOM_TO_STRING(VkExtent2D.class, e->e.getClass().getName()+"{h="+e.height()+", w="+e.height()+"}");
-		LogUtil.__.INIT(true, false, null);
+		LogUtil.__.INIT(true, false, "log");
 		LogUtil.println("STARTED at "+Date.from(Instant.now()));
-		LogUtil.printlnEr("STARTED at "+Date.from(Instant.now()), "\"xD \" ");
+		LogUtil.printlnEr("STARTED at "+Date.from(Instant.now()), "\"xD\"");
 		
 		new VulkanRenderImpl();
 	}
@@ -74,7 +74,7 @@ public class VulkanRenderImpl{
 	private VkRenderPass  renderPass;
 	
 	private PointerBuffer layers;
-	private List<String>  deviceExtensions=new ArrayList<>(List.of(VK_KHR_SWAPCHAIN_EXTENSION_NAME));
+	private List<String> deviceExtensions=new ArrayList<>(List.of(VK_KHR_SWAPCHAIN_EXTENSION_NAME));
 	
 	private boolean swapchainRecreationPending=false;
 	
@@ -142,7 +142,7 @@ public class VulkanRenderImpl{
 		
 		try(MemoryStack stack=stackPush()){
 			
-			BufferedImage img      =ImageIO.read(dataManager.getInStream("textures/SmalSmugDude.png"));
+			BufferedImage img      =ImageIO.read(dataManager.getInStream("textures/SmugDude.png"));
 			int           imageSize=img.getWidth()*img.getHeight()*4;
 			
 			VkBufferMemory stagingMemory=gpu.createBufferMem(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -173,9 +173,9 @@ public class VulkanRenderImpl{
 			
 			model.texture.image.transitionImageLayout(gpu, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 			copyBufferToImage(stagingMemory.getBuffer(), model.texture.image);
+			stagingMemory.destroy();
 			model.texture.image.transitionImageLayout(gpu, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			
-			stagingMemory.destroy(gpu);
 			model.texture.init(gpu, VkImageAspect.COLOR);
 			
 			
@@ -287,7 +287,7 @@ public class VulkanRenderImpl{
 		
 		swapChain.destroy();
 		swapChain=null;
-		renderPass.destroy(gpu.getDevice());
+		renderPass.destroy();
 		renderPass=null;
 		shader.destroy();
 		shader=null;
@@ -350,11 +350,7 @@ public class VulkanRenderImpl{
 			       .pColorAttachments(
 				       VkAttachmentReference.mallocStack(1, stack)
 				                            .attachment(0)
-				                            .layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL))
-			       .pDepthStencilAttachment(
-				       VkAttachmentReference.callocStack(stack)
-				                            .attachment(1)
-				                            .layout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL));
+				                            .layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
 			
 			VkSubpassDependency.Buffer dependency=VkSubpassDependency.mallocStack(1, stack);
 			dependency.srcSubpass(VK_SUBPASS_EXTERNAL)
@@ -370,7 +366,7 @@ public class VulkanRenderImpl{
 			              .pSubpasses(subpass)
 			              .pDependencies(dependency);
 			
-			renderPass=Vk.createRenderPass(gpu.getDevice(), renderPassInfo, stack.mallocLong(1));
+			renderPass=Vk.createRenderPass(gpu, renderPassInfo, stack.mallocLong(1));
 		}
 	}
 	
@@ -578,10 +574,10 @@ public class VulkanRenderImpl{
 	private void destroy(){
 		window.hide();
 		
-		imageAvailableSemaphore.destroy(gpu);
-		renderFinishedSemaphore.destroy(gpu);
+		imageAvailableSemaphore.destroy();
+		renderFinishedSemaphore.destroy();
 		
-		model.destroy(gpu);
+		model.destroy();
 		
 		destroySwapChain();
 		

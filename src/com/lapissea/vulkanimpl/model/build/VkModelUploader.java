@@ -32,7 +32,7 @@ public class VkModelUploader{
 			}
 			
 			memory.flushMemory(gpu);
-			stagingMemory.destroy(gpu.getDevice());
+			stagingMemory.destroy();
 			gpu.waitIdle();
 			
 			return new VkModel(memory, modelBuilder.format, dataSize, indices16Bit?VK_INDEX_TYPE_UINT16:VK_INDEX_TYPE_UINT32, indexCount!=0?indexCount:size/modelBuilder.format.getSizeBytes());

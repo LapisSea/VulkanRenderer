@@ -2,21 +2,24 @@ package com.lapissea.vulkanimpl.simplevktypes;
 
 import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
+import com.lapissea.vulkanimpl.util.VkDestroyable;
+import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.vulkan.VkDevice;
 
 import java.nio.LongBuffer;
+import java.util.Objects;
 
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
-public class VkFence extends ExtendableLong{
+public class VkFence extends ExtendableLong implements VkDestroyable, VkGpuCtx{
 	
 	public static final VkFence NULL;
 	
 	static{
 		NULL=new VkFence(memAllocLong(1).put(0, VK_NULL_HANDLE)){
 			@Override
-			public void destroy(VkDevice device){
+			public void destroy(){
 				throw new UnsupportedOperationException();
 			}
 			
@@ -28,12 +31,22 @@ public class VkFence extends ExtendableLong{
 		
 	}
 	
-	private LongBuffer buff;
+	private       LongBuffer buff;
+	private final VkGpu      gpu;
 	
-	public VkFence(LongBuffer buff){
+	public VkFence(VkGpuCtx gpuCtx, LongBuffer buff){
 		super(buff.get(0));
 		this.buff=buff;
+		gpu=gpuCtx.getGpu();
+		if(Vk.DEBUG) Objects.requireNonNull(gpu);
 	}
+	
+	private VkFence(LongBuffer buff){
+		super(buff.get(0));
+		this.buff=buff;
+		gpu=null;
+	}
+	
 	
 	public void waitFor(VkGpu gpu){
 		waitFor(gpu.getDevice());
@@ -43,16 +56,18 @@ public class VkFence extends ExtendableLong{
 		Vk.waitForFences(device, buff);
 	}
 	
-	public void destroy(VkGpu gpu){
-		destroy(gpu.getDevice());
-	}
-	
-	public void destroy(VkDevice device){
-		vkDestroyFence(device, val, null);
+	@Override
+	public void destroy(){
+		vkDestroyFence(getGpuDevice(), val, null);
 		val=0;
 		if(buff!=null){
 			memFree(buff);
 			buff=null;
 		}
+	}
+	
+	@Override
+	public VkGpu getGpu(){
+		return gpu;
 	}
 }

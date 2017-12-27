@@ -3,29 +3,33 @@ package com.lapissea.vulkanimpl.simplevktypes;
 import com.lapissea.vulkanimpl.IMemoryAddressable;
 import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
+import com.lapissea.vulkanimpl.util.VkDestroyable;
+import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkMemoryRequirements;
 
+import java.util.Objects;
+
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
-public class VkBuffer extends ExtendableLong implements IMemoryAddressable{
+public class VkBuffer extends ExtendableLong implements IMemoryAddressable, VkDestroyable, VkGpuCtx{
 	
 	private long alignment=-1;
-	private long size;
+	private       long  size;
+	private final VkGpu gpu;
 	
-	public VkBuffer(long val, long size){
+	public VkBuffer(VkGpuCtx gpuCtx, long val, long size){
 		super(val);
 		this.size=size;
+		gpu=gpuCtx.getGpu();
+		if(Vk.DEBUG) Objects.requireNonNull(gpu);
 	}
 	
-	public void destroy(VkGpu gpu){
-		destroy(gpu.getDevice());
-	}
-	
-	public void destroy(VkDevice device){
-		vkDestroyBuffer(device, get(), null);
+	@Override
+	public void destroy(){
+		vkDestroyBuffer(getGpuDevice(), get(), null);
 		alignment=-1;
 		val=0;
 	}
@@ -58,5 +62,10 @@ public class VkBuffer extends ExtendableLong implements IMemoryAddressable{
 	
 	public void bind(VkDevice device, VkDeviceMemory memory, int offset){
 		Vk.bindBufferMemory(device, this, memory, offset);
+	}
+	
+	@Override
+	public VkGpu getGpu(){
+		return gpu;
 	}
 }

@@ -5,6 +5,7 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vec.color.IColorM;
 import com.lapissea.vulkanimpl.simplevktypes.*;
+import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -122,7 +123,6 @@ public class Vk{
 		}
 	}
 	
-	@SuppressWarnings("boxing")
 	public static void check(int code){
 		if(!DEBUG) throw new IllegalStateException();
 		
@@ -340,15 +340,15 @@ public class Vk{
 		}
 	}
 	
-	public static VkImageView createImageView(VkDevice device, VkImageViewCreateInfo createInfo, LongBuffer dest){
-		int code=VK10.vkCreateImageView(device, createInfo, null, dest);
+	public static VkImageView createImageView(VkGpuCtx gpuCtx, VkImageViewCreateInfo createInfo, LongBuffer dest){
+		int code=VK10.vkCreateImageView(gpuCtx.getGpuDevice(), createInfo, null, dest);
 		if(DEBUG) check(code);
-		return new VkImageView(dest.get(0));
+		return new VkImageView(gpuCtx, dest.get(0));
 	}
 	
-	public static VkShaderModule createShaderModule(VkDevice device, byte[] code, Shader.Type type){
-		VkShaderModule res=new VkShaderModule(type);
-		res.create(device, code);
+	public static VkShaderModule createShaderModule(VkGpu gpu, byte[] code, Shader.Type type){
+		VkShaderModule res=new VkShaderModule(gpu, type);
+		res.create(code);
 		return res;
 	}
 	
@@ -358,38 +358,38 @@ public class Vk{
 		return dest.get(0);
 	}
 	
-	public static VkPipelineLayout createPipelineLayout(VkDevice device, VkPipelineLayoutCreateInfo createInfo, LongBuffer dest){
-		int code=VK10.vkCreatePipelineLayout(device, createInfo, null, dest);
+	public static VkPipelineLayout createPipelineLayout(VkGpuCtx gpuCtx, VkPipelineLayoutCreateInfo createInfo, LongBuffer dest){
+		int code=VK10.vkCreatePipelineLayout(gpuCtx.getGpuDevice(), createInfo, null, dest);
 		if(DEBUG) check(code);
-		return new VkPipelineLayout(dest.get(0));
+		return new VkPipelineLayout(gpuCtx, dest.get(0));
 	}
 	
-	public static VkRenderPass createRenderPass(VkDevice device, VkRenderPassCreateInfo renderPassInfo, LongBuffer dest){
-		int code=VK10.vkCreateRenderPass(device, renderPassInfo, null, dest);
+	public static VkRenderPass createRenderPass(VkGpuCtx gpuCtx, VkRenderPassCreateInfo renderPassInfo, LongBuffer dest){
+		int code=VK10.vkCreateRenderPass(gpuCtx.getGpuDevice(), renderPassInfo, null, dest);
 		if(DEBUG) check(code);
-		return new VkRenderPass(dest.get(0));
+		return new VkRenderPass(gpuCtx, dest.get(0));
 	}
 	
-	public static VkGraphicsPipeline[] createGraphicsPipelines(VkDevice device, VkGraphicsPipelineCreateInfo.Buffer pipelineInfo, LongBuffer dest){
-		int code=VK10.vkCreateGraphicsPipelines(device, 0, pipelineInfo, null, dest);
+	public static VkGraphicsPipeline[] createGraphicsPipelines(VkGpuCtx gpuCtx, VkGraphicsPipelineCreateInfo.Buffer pipelineInfo, LongBuffer dest){
+		int code=VK10.vkCreateGraphicsPipelines(gpuCtx.getGpuDevice(), 0, pipelineInfo, null, dest);
 		if(DEBUG) check(code);
 		VkGraphicsPipeline[] res=new VkGraphicsPipeline[pipelineInfo.remaining()];
 		for(int i=0, j=pipelineInfo.capacity();i<j;i++){
-			res[i]=new VkGraphicsPipeline(dest.get(i));
+			res[i]=new VkGraphicsPipeline(gpuCtx, dest.get(i));
 		}
 		return res;
 	}
 	
-	public static VkFramebuffer createFrameBuffer(VkDevice device, VkFramebufferCreateInfo framebufferInfo, LongBuffer dest){
-		int code=VK10.vkCreateFramebuffer(device, framebufferInfo, null, dest);
+	public static VkFramebuffer createFrameBuffer(VkGpuCtx gpuCtx, VkFramebufferCreateInfo framebufferInfo, LongBuffer dest){
+		int code=VK10.vkCreateFramebuffer(gpuCtx.getGpuDevice(), framebufferInfo, null, dest);
 		if(DEBUG) check(code);
-		return new VkFramebuffer(dest.get(0));
+		return new VkFramebuffer(gpuCtx.getGpu(), dest.get(0));
 	}
 	
-	public static VkCommandPool createCommandPool(VkDevice device, VkCommandPoolCreateInfo poolInfo, LongBuffer dest){
-		int code=VK10.vkCreateCommandPool(device, poolInfo, null, dest);
+	public static VkCommandPool createCommandPool(VkGpuCtx gpuCtx, VkCommandPoolCreateInfo poolInfo, LongBuffer dest){
+		int code=VK10.vkCreateCommandPool(gpuCtx.getGpuDevice(), poolInfo, null, dest);
 		if(DEBUG) check(code);
-		return new VkCommandPool(dest.get(0));
+		return new VkCommandPool(gpuCtx, dest.get(0));
 	}
 	
 	public static VkCommandBuffer[] allocateCommandBuffers(VkDevice device, VkCommandBufferAllocateInfo allocInfo, PointerBuffer dest){
@@ -410,12 +410,12 @@ public class Vk{
 		if(DEBUG) check(code);
 	}
 	
-	public static VkSemaphore createSemaphore(VkDevice device, VkSemaphoreCreateInfo semaphoreInfo){
+	public static VkSemaphore createSemaphore(VkGpuCtx gpuCtx, VkSemaphoreCreateInfo semaphoreInfo){
 		LongBuffer dest=memAllocLong(1);
 		
-		int code=VK10.vkCreateSemaphore(device, semaphoreInfo, null, dest);
+		int code=VK10.vkCreateSemaphore(gpuCtx.getGpuDevice(), semaphoreInfo, null, dest);
 		if(DEBUG) check(code);
-		return new VkSemaphore(dest);
+		return new VkSemaphore(gpuCtx.getGpu(), dest);
 	}
 	
 	public static int acquireNextImageKHR(VkDevice device, VkSwapchain swapChain, VkSemaphore semaphore, IntBuffer dest){
@@ -425,16 +425,16 @@ public class Vk{
 		return dest.get(0);
 	}
 	
-	public static VkBuffer createBuffer(VkDevice device, VkBufferCreateInfo bufferInfo, LongBuffer dest){
-		int code=vkCreateBuffer(device, bufferInfo, null, dest);
+	public static VkBuffer createBuffer(VkGpuCtx gpuCtx, VkBufferCreateInfo bufferInfo, LongBuffer dest){
+		int code=vkCreateBuffer(gpuCtx.getGpuDevice(), bufferInfo, null, dest);
 		if(DEBUG) check(code);
-		return new VkBuffer(dest.get(0), bufferInfo.size());
+		return new VkBuffer(gpuCtx, dest.get(0), bufferInfo.size());
 	}
 	
-	public static VkDeviceMemory allocateMemory(VkDevice device, VkMemoryAllocateInfo allocInfo, LongBuffer dest){
-		int code=vkAllocateMemory(device, allocInfo, null, dest);
+	public static VkDeviceMemory allocateMemory(VkGpuCtx gpuCtx, VkMemoryAllocateInfo allocInfo, LongBuffer dest){
+		int code=vkAllocateMemory(gpuCtx.getGpuDevice(), allocInfo, null, dest);
 		if(DEBUG) check(code);
-		return new VkDeviceMemory(dest.get(0));
+		return new VkDeviceMemory(gpuCtx, dest.get(0));
 		
 	}
 	
@@ -498,24 +498,24 @@ public class Vk{
 		if(DEBUG) check(code);
 	}
 	
-	public static VkDescriptorSetLayout createDescriptorSetLayout(VkDevice device, VkDescriptorSetLayoutCreateInfo info, MemoryStack stack){
-		return createDescriptorSetLayout(device, info, stack.callocLong(1));
+	public static VkDescriptorSetLayout createDescriptorSetLayout(VkGpuCtx gpuCtx, VkDescriptorSetLayoutCreateInfo info, MemoryStack stack){
+		return createDescriptorSetLayout(gpuCtx, info, stack.callocLong(1));
 	}
 	
-	public static VkDescriptorSetLayout createDescriptorSetLayout(VkDevice device, VkDescriptorSetLayoutCreateInfo info, LongBuffer dest){
-		int code=vkCreateDescriptorSetLayout(device, info, null, dest);
+	public static VkDescriptorSetLayout createDescriptorSetLayout(VkGpuCtx gpuCtx, VkDescriptorSetLayoutCreateInfo info, LongBuffer dest){
+		int code=vkCreateDescriptorSetLayout(gpuCtx.getGpuDevice(), info, null, dest);
 		if(DEBUG) check(code);
-		return new VkDescriptorSetLayout(dest.get(0));
+		return new VkDescriptorSetLayout(gpuCtx, dest.get(0));
 	}
 	
-	public static VkDescriptorPool createDescriptorPool(VkDevice device, VkDescriptorPoolCreateInfo info, MemoryStack stack){
-		return createDescriptorPool(device, info, stack.callocLong(1));
+	public static VkDescriptorPool createDescriptorPool(VkGpuCtx gpuCtx, VkDescriptorPoolCreateInfo info, MemoryStack stack){
+		return createDescriptorPool(gpuCtx, info, stack.callocLong(1));
 	}
 	
-	public static VkDescriptorPool createDescriptorPool(VkDevice device, VkDescriptorPoolCreateInfo info, LongBuffer dest){
-		int code=vkCreateDescriptorPool(device, info, null, dest);
+	public static VkDescriptorPool createDescriptorPool(VkGpuCtx gpuCtx, VkDescriptorPoolCreateInfo info, LongBuffer dest){
+		int code=vkCreateDescriptorPool(gpuCtx.getGpuDevice(), info, null, dest);
 		if(DEBUG) check(code);
-		return new VkDescriptorPool(dest.get(0));
+		return new VkDescriptorPool(gpuCtx, dest.get(0));
 	}
 	
 	public static VkDescriptorSet allocateDescriptorSets(VkDevice device, VkDescriptorSetAllocateInfo info, MemoryStack stack){
@@ -539,12 +539,12 @@ public class Vk{
 		if(DEBUG) check(code);
 	}
 	
-	public static VkFence createFence(VkDevice device, VkFenceCreateInfo fenceInfo){
+	public static VkFence createFence(VkGpuCtx gpuCtx, VkFenceCreateInfo fenceInfo){
 		LongBuffer buff=memAllocLong(1);
 		
-		int code=vkCreateFence(device, fenceInfo, null, buff);
+		int code=vkCreateFence(gpuCtx.getGpuDevice(), fenceInfo, null, buff);
 		if(DEBUG) check(code);
-		return new VkFence(buff);
+		return new VkFence(gpuCtx, buff);
 	}
 	
 	public static void waitForFences(VkDevice device, LongBuffer fence){
@@ -552,16 +552,16 @@ public class Vk{
 		if(DEBUG) check(code);
 	}
 	
-	public static VkImage createImage(VkDevice device, VkImageCreateInfo imageInfo, LongBuffer dest){
-		int code=vkCreateImage(device, imageInfo, null, dest);
+	public static VkImage createImage(VkGpuCtx gpuCtx, VkImageCreateInfo imageInfo, LongBuffer dest){
+		int code=vkCreateImage(gpuCtx.getGpuDevice(), imageInfo, null, dest);
 		if(DEBUG) check(code);
-		return new VkImage(dest.get(0), imageInfo.extent().width(), imageInfo.extent().height(), imageInfo.format());
+		return new VkImage(gpuCtx, dest.get(0), imageInfo.extent().width(), imageInfo.extent().height(), imageInfo.format());
 	}
 	
-	public static VkSampler createSampler(VkDevice device, VkSamplerCreateInfo samplerInfo, LongBuffer dest){
-		int code=vkCreateSampler(device, samplerInfo, null, dest);
+	public static VkSampler createSampler(VkGpuCtx gpuCtx, VkSamplerCreateInfo samplerInfo, LongBuffer dest){
+		int code=vkCreateSampler(gpuCtx.getGpuDevice(), samplerInfo, null, dest);
 		if(DEBUG) check(code);
-		return new VkSampler(dest.get(0));
+		return new VkSampler(gpuCtx, dest.get(0));
 	}
 	
 	public static VkImageCreateInfo imageCreateInfo(MemoryStack stack, int width, int height, int format, VkGpu.Feature feature, int usage){

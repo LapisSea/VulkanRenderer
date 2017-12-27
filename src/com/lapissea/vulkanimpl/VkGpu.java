@@ -2,6 +2,7 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.vulkanimpl.model.VkBufferMemory;
 import com.lapissea.vulkanimpl.simplevktypes.*;
+import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import com.lapissea.vulkanimpl.util.VkImageAspect;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -21,7 +22,8 @@ import static com.lapissea.vulkanimpl.BufferUtil.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
-public class VkGpu{
+public class VkGpu implements VkGpuCtx{
+	
 	
 	public enum Feature{
 		LINEAR(VK_IMAGE_TILING_LINEAR, f->f.linearTilingFeatures),
@@ -120,8 +122,8 @@ public class VkGpu{
 		if(formats!=null) formats.free();
 		MemoryUtil.memFree(presentModes);
 		
-		if(graphicsPool!=null) graphicsPool.destroy(getDevice());
-		if(transferPool!=null) transferPool.destroy(getDevice());
+		if(graphicsPool!=null) graphicsPool.destroy();
+		if(transferPool!=null) transferPool.destroy();
 		
 		if(device!=null) Vk.destroyDevice(device);
 		
@@ -340,7 +342,7 @@ public class VkGpu{
 			VkCommandPoolCreateInfo poolInfo=VkCommandPoolCreateInfo.callocStack(stack);
 			poolInfo.sType(VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO);
 			poolInfo.queueFamilyIndex(id);
-			return Vk.createCommandPool(getDevice(), poolInfo, stack.callocLong(1));
+			return Vk.createCommandPool(this, poolInfo, stack.callocLong(1));
 		}
 	}
 	
@@ -367,7 +369,7 @@ public class VkGpu{
 	}
 	
 	public VkFence createFence(VkFenceCreateInfo fenceInfo){
-		return Vk.createFence(getDevice(), fenceInfo);
+		return Vk.createFence(this, fenceInfo);
 	}
 	
 	public VkSemaphore createSemaphore(){
@@ -379,12 +381,12 @@ public class VkGpu{
 	}
 	
 	public VkSemaphore createSemaphore(VkSemaphoreCreateInfo semaphoreInfo){
-		return Vk.createSemaphore(getDevice(), semaphoreInfo);
+		return Vk.createSemaphore(this, semaphoreInfo);
 	}
 	
 	public VkBuffer createBuffer(int size, int usage){
 		try(MemoryStack stack=stackPush()){
-			return Vk.createBuffer(getDevice(), Vk.bufferInfo(stack, size, usage), stack.mallocLong(1));
+			return Vk.createBuffer(this, Vk.bufferInfo(stack, size, usage), stack.mallocLong(1));
 		}
 	}
 	
@@ -402,7 +404,7 @@ public class VkGpu{
 			        .allocationSize(Math.max(memRequ.size(), size))
 			        .memoryTypeIndex(findMemoryType(memRequ.memoryTypeBits(), properties));
 			
-			return Vk.allocateMemory(getDevice(), memAlloc, stack.mallocLong(1));
+			return Vk.allocateMemory(this, memAlloc, stack.mallocLong(1));
 		}
 	}
 	
@@ -423,7 +425,7 @@ public class VkGpu{
 	
 	public VkDeviceMemory alocateMem(VkMemoryAllocateInfo memAlloc){
 		try(MemoryStack stack=stackPush()){
-			return Vk.allocateMemory(getDevice(), memAlloc, stack.mallocLong(1));
+			return Vk.allocateMemory(this, memAlloc, stack.mallocLong(1));
 		}
 	}
 	
@@ -451,13 +453,13 @@ public class VkGpu{
 			        .pPoolSizes(poolSize)
 			        .maxSets(maxSets);
 			
-			return Vk.createDescriptorPool(getDevice(), poolInfo, stack);
+			return Vk.createDescriptorPool(this, poolInfo, stack);
 		}
 	}
 	
 	public VkImage createImage(VkImageCreateInfo imageInfo){
 		try(MemoryStack stack=stackPush()){
-			return Vk.createImage(getDevice(), imageInfo, stack.mallocLong(1));
+			return Vk.createImage(this, imageInfo, stack.mallocLong(1));
 		}
 	}
 	
@@ -513,8 +515,12 @@ public class VkGpu{
 			     .b(VK_COMPONENT_SWIZZLE_IDENTITY)
 			     .a(VK_COMPONENT_SWIZZLE_IDENTITY);
 			
-			return Vk.createImageView(getDevice(), createInfo, stack.callocLong(1));
+			return Vk.createImageView(this, createInfo, stack.callocLong(1));
 		}
 	}
 	
+	@Override
+	public VkGpu getGpu(){
+		return this;
+	}
 }

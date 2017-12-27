@@ -29,13 +29,9 @@ public class VkBufferMemory{
 	}
 	
 	
-	public void destroy(VkGpu gpu){
-		destroy(gpu.getDevice());
-	}
-	
-	public void destroy(VkDevice device){
-		buffer.destroy(device);
-		memory.destroy(device);
+	public void destroy(){
+		buffer.destroy();
+		memory.destroy();
 		if(range!=null){
 			range.free();
 			range=null;
@@ -96,7 +92,7 @@ public class VkBufferMemory{
 		
 		private MemorySession(VkDevice device, int offset, long byteSize){
 			this.device=device;
-			this.memory=mapMemory(device, pointer, offset, byteSize).getByteBuffer(byteSize());
+			memory=mapMemory(device, pointer, offset, byteSize).getByteBuffer(byteSize());
 		}
 		
 		@Override

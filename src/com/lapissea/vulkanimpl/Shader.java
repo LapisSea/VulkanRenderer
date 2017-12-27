@@ -57,17 +57,17 @@ public class Shader{
 		
 		this.gpu=gpu;
 		try{
-			vs=Vk.createShaderModule(gpu.getDevice(), read(name, Type.VERTEX), Type.VERTEX);
+			vs=Vk.createShaderModule(gpu, read(name, Type.VERTEX), Type.VERTEX);
 		}catch(Exception e){
 			throw UtilL.uncheckedThrow(e);
 		}
 		
 		try{
-			gs=Vk.createShaderModule(gpu.getDevice(), read(name, Type.GEOMETRY), Type.GEOMETRY);
+			gs=Vk.createShaderModule(gpu, read(name, Type.GEOMETRY), Type.GEOMETRY);
 		}catch(Exception e){}
 		
 		try{
-			fs=Vk.createShaderModule(gpu.getDevice(), read(name, Type.FRAGMENT), Type.FRAGMENT);
+			fs=Vk.createShaderModule(gpu, read(name, Type.FRAGMENT), Type.FRAGMENT);
 		}catch(Exception e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -137,7 +137,7 @@ public class Shader{
 			descriptorSetLayout.sType(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO)
 			                   .pBindings(uboLayoutBindings);
 			
-			layout=Vk.createDescriptorSetLayout(gpu.getDevice(), descriptorSetLayout, stack);
+			layout=Vk.createDescriptorSetLayout(gpu, descriptorSetLayout, stack);
 			
 			
 			VkPipelineLayoutCreateInfo layoutInfo=VkPipelineLayoutCreateInfo.callocStack(stack);
@@ -146,7 +146,7 @@ public class Shader{
 			          .pPushConstantRanges(null)
 			          .pSetLayouts(buffSingle(stack, layout));
 			
-			pipelineLayout=Vk.createPipelineLayout(gpu.getDevice(), layoutInfo, stack.callocLong(1));
+			pipelineLayout=Vk.createPipelineLayout(gpu, layoutInfo, stack.callocLong(1));
 			
 			VkPipelineDepthStencilStateCreateInfo depthStencilState=VkPipelineDepthStencilStateCreateInfo.callocStack(stack);
 			depthStencilState.sType(VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO)
@@ -237,7 +237,7 @@ public class Shader{
 			            .basePipelineIndex(-1)
 			;
 			
-			graphicsPipeline=Vk.createGraphicsPipelines(gpu.getDevice(), pipelineInfo, stack.callocLong(1))[0];
+			graphicsPipeline=Vk.createGraphicsPipelines(gpu, pipelineInfo, stack.callocLong(1))[0];
 			gpu.waitIdle();
 			
 			initUniforms(model);
@@ -323,17 +323,17 @@ public class Shader{
 	}
 	
 	public void destroy(){
-		descriptorPool.destroy(gpu);
+		descriptorPool.destroy();
 		descriptorSetLayout.free();
-		layout.destroy(gpu);
+		layout.destroy();
 		if(fs!=null){
-			vs.destroy(gpu);
-			fs.destroy(gpu);
+			vs.destroy();
+			fs.destroy();
 			vs=fs=null;
 		}
-		uniformBuffer.destroy(gpu);
-		graphicsPipeline.destroy(gpu);
-		pipelineLayout.destroy(gpu);
+		uniformBuffer.destroy();
+		graphicsPipeline.destroy();
+		pipelineLayout.destroy();
 		
 		gpu=null;
 		graphicsPipeline=null;

@@ -4,16 +4,21 @@ import com.lapissea.vulkanimpl.IMemoryAddressable;
 import com.lapissea.vulkanimpl.SingleUseCommands;
 import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
+import com.lapissea.vulkanimpl.util.VkDestroyable;
+import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkImageMemoryBarrier;
 import org.lwjgl.vulkan.VkImageSubresourceRange;
 import org.lwjgl.vulkan.VkMemoryRequirements;
 
+import java.util.Objects;
+
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
-public class VkImage extends ExtendableLong implements IMemoryAddressable{
+public class VkImage extends ExtendableLong implements IMemoryAddressable, VkDestroyable, VkGpuCtx{
+	
 	
 	public static int getFormatBytePerPixel(int format){
 		switch(format){
@@ -31,21 +36,21 @@ public class VkImage extends ExtendableLong implements IMemoryAddressable{
 	}
 	
 	public final int byteSize, width, height, format;
+	private final VkGpu gpu;
 	
-	public VkImage(long val, int width, int height, int format){
+	public VkImage(VkGpuCtx gpuCtx, long val, int width, int height, int format){
 		super(val);
 		this.width=width;
 		this.height=height;
 		this.format=format;
 		byteSize=width*height*getFormatBytePerPixel(format);
+		gpu=gpuCtx.getGpu();
+		if(Vk.DEBUG) Objects.requireNonNull(gpu);
 	}
 	
-	public void destroy(VkGpu gpu){
-		destroy(gpu.getDevice());
-	}
-	
-	public void destroy(VkDevice device){
-		vkDestroyImage(device, get(), null);
+	@Override
+	public void destroy(){
+		vkDestroyImage(getGpuDevice(), get(), null);
 		val=0;
 	}
 	
@@ -137,5 +142,10 @@ public class VkImage extends ExtendableLong implements IMemoryAddressable{
 	
 	private boolean hasStencilComponent(int format){
 		return format==VK_FORMAT_D32_SFLOAT_S8_UINT||format==VK_FORMAT_D24_UNORM_S8_UINT;
+	}
+	
+	@Override
+	public VkGpu getGpu(){
+		return gpu;
 	}
 }

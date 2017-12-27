@@ -1,22 +1,32 @@
 package com.lapissea.vulkanimpl.simplevktypes;
 
+import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
-import org.lwjgl.vulkan.VkDevice;
+import com.lapissea.vulkanimpl.util.VkDestroyable;
+import com.lapissea.vulkanimpl.util.VkGpuCtx;
+
+import java.util.Objects;
 
 import static org.lwjgl.vulkan.VK10.*;
 
-public class VkCommandPool extends ExtendableLong{
+public class VkCommandPool extends ExtendableLong implements VkDestroyable, VkGpuCtx{
 	
-	public VkCommandPool(long val){
+	private final VkGpu gpu;
+	
+	public VkCommandPool(VkGpuCtx gpuCtx, long val){
 		super(val);
+		gpu=gpuCtx.getGpu();
+		if(Vk.DEBUG) Objects.requireNonNull(gpu);
 	}
 	
-	public void destroy(VkGpu gpu){
-		destroy(gpu.getDevice());
-	}
-	
-	public void destroy(VkDevice device){
-		vkDestroyCommandPool(device, get(), null);
+	@Override
+	public void destroy(){
+		vkDestroyCommandPool(getGpuDevice(), get(), null);
 		val=0;
+	}
+	
+	@Override
+	public VkGpu getGpu(){
+		return gpu;
 	}
 }

@@ -48,7 +48,7 @@ public class SingleUseCommands implements AutoCloseable{
 		fence.waitFor(gpu);
 		
 		vkFreeCommandBuffers(gpu.getDevice(), gpu.getTransferPool().get(), commandBuffer);
-		fence.destroy(gpu);
+		fence.destroy();
 		
 		commandBuffer=null;
 		stack=null;

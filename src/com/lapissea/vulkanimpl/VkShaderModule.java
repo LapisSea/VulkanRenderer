@@ -1,5 +1,7 @@
 package com.lapissea.vulkanimpl;
 
+import com.lapissea.vulkanimpl.util.VkDestroyable;
+import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkDevice;
@@ -8,15 +10,20 @@ import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 
 import java.nio.ByteBuffer;
 import java.nio.LongBuffer;
+import java.util.Objects;
 
 import static org.lwjgl.system.MemoryUtil.*;
+import static org.lwjgl.vulkan.VK10.*;
 
-public class VkShaderModule{
-	private      long        id;
-	public final Shader.Type type;
+public class VkShaderModule implements VkDestroyable, VkGpuCtx{
+	private       long        id;
+	public final  Shader.Type type;
+	private final VkGpu       gpu;
 	
-	public VkShaderModule(Shader.Type type){
+	public VkShaderModule(VkGpu gpu, Shader.Type type){
 		this.type=type;
+		if(Vk.DEBUG) Objects.requireNonNull(gpu);
+		this.gpu=gpu;
 	}
 	
 	
@@ -30,7 +37,7 @@ public class VkShaderModule{
 		return shaderStageInfo;
 	}
 	
-	public void create(VkDevice device, byte[] code){
+	public void create(byte[] code){
 		VkShaderModuleCreateInfo createInfo=VkShaderModuleCreateInfo.calloc();
 		createInfo.sType(VK10.VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
 		
@@ -41,18 +48,20 @@ public class VkShaderModule{
 		createInfo.pCode(buff);
 		
 		LongBuffer res=memAllocLong(1);
-		id=Vk.createShaderModule(device, createInfo, res);
+		id=Vk.createShaderModule(getGpuDevice(), createInfo, res);
 		
 		memFree(buff);
 		memFree(res);
 	}
 	
-	public void destroy(VkGpu gpu){
-		destroy(gpu.getDevice());
+	@Override
+	public void destroy(){
+		vkDestroyShaderModule(getGpuDevice(), id, null);
+		id=0;
 	}
 	
-	public void destroy(VkDevice device){
-		VK10.vkDestroyShaderModule(device, id, null);
-		id=0;
+	@Override
+	public VkGpu getGpu(){
+		return gpu;
 	}
 }
