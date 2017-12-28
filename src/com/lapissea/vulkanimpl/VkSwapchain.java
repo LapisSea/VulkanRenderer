@@ -167,8 +167,6 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 			VkGpu.Feature feature    =VkGpu.Feature.OPTIMAL;
 			int           depthFormat=gpu.anyFormat(feature, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT);
 			if(depthFormat==-1) UtilL.exitWithErrorMsg("Unsupported depth format");
-//			LogUtil.println(depthFormat);
-//			System.exit(0);
 			depth=gpu.createImageTexture(Vk.imageCreateInfo(stack, imageSize.x(), imageSize.y(), depthFormat, feature, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT), VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			depth.init(gpu, VkImageAspect.DEPTH);
 			depth.image.transitionImageLayout(gpu, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

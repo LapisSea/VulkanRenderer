@@ -19,6 +19,7 @@ import com.lapissea.vulkanimpl.simplevktypes.VkImage;
 import com.lapissea.vulkanimpl.simplevktypes.VkRenderPass;
 import com.lapissea.vulkanimpl.simplevktypes.VkSemaphore;
 import com.lapissea.vulkanimpl.util.VkImageAspect;
+import com.lapissea.vulkanimpl.util.VkImageFormat;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.system.MemoryStack;
@@ -39,6 +40,8 @@ import java.util.Date;
 import java.util.List;
 
 import static com.lapissea.vulkanimpl.BufferUtil.*;
+import static com.lapissea.vulkanimpl.util.VkImageFormat.Format.*;
+import static com.lapissea.vulkanimpl.util.VkImageFormat.Type.*;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryStack.*;
@@ -54,7 +57,6 @@ public class VulkanRenderImpl{
 		TextUtil.__REGISTER_CUSTOM_TO_STRING(VkExtent2D.class, e->e.getClass().getName()+"{h="+e.height()+", w="+e.height()+"}");
 		LogUtil.__.INIT(true, false, "log");
 		LogUtil.println("STARTED at "+Date.from(Instant.now()));
-		LogUtil.printlnEr("STARTED at "+Date.from(Instant.now()), "\"xD\"");
 		
 		new VulkanRenderImpl();
 	}
@@ -90,6 +92,8 @@ public class VulkanRenderImpl{
 	private DataManager dataManager;
 	
 	public VulkanRenderImpl(){
+		
+		VkImageFormat.get(DEPTH, 24, false, NORM, STENCIL, 8, true, INT);
 		
 		dataManager=new DataManager();
 		dataManager.registerDomain(new File("res"));
@@ -163,9 +167,8 @@ public class VulkanRenderImpl{
 			         .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
 			         .usage(VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT)
 			         .sharingMode(VK_SHARING_MODE_EXCLUSIVE)
-			         .samples(VK_SAMPLE_COUNT_1_BIT);
-			
-			imageInfo.extent().set(img.getWidth(), img.getHeight(), 1);
+			         .samples(VK_SAMPLE_COUNT_1_BIT)
+			         .extent().set(img.getWidth(), img.getHeight(), 1);
 			
 			
 			model.texture=gpu.createImageTexture(imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -191,12 +194,10 @@ public class VulkanRenderImpl{
 			region.get(0)
 			      .bufferOffset(0)
 			      .bufferRowLength(0)
-			      .bufferImageHeight(0)
-			      .imageOffset(VkOffset3D.callocStack(stack).set(0, 0, 0))
-			      .imageExtent(VkExtent3D.callocStack(stack).set(image.width, image.height, 1));
-			
-			region.get(0)
-			      .imageSubresource()
+			      .bufferImageHeight(0);
+			region.get(0).imageOffset().set(0, 0, 0);
+			region.get(0).imageExtent().set(image.width, image.height, 1);
+			region.get(0).imageSubresource()
 			      .aspectMask(VK_IMAGE_ASPECT_COLOR_BIT)
 			      .mipLevel(0)
 			      .baseArrayLayer(0)

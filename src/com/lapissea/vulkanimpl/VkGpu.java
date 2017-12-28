@@ -2,6 +2,7 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.vulkanimpl.model.VkBufferMemory;
 import com.lapissea.vulkanimpl.simplevktypes.*;
+import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import com.lapissea.vulkanimpl.util.VkImageAspect;
 import gnu.trove.list.TIntList;
@@ -20,9 +21,10 @@ import java.util.function.Function;
 
 import static com.lapissea.vulkanimpl.BufferUtil.*;
 import static org.lwjgl.system.MemoryStack.*;
+import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
-public class VkGpu implements VkGpuCtx{
+public class VkGpu implements VkGpuCtx, VkDestroyable{
 	
 	
 	public enum Feature{
@@ -111,6 +113,7 @@ public class VkGpu implements VkGpuCtx{
 		setWindow(window);
 	}
 	
+	@Override
 	public void destroy(){
 		if(features!=null) features.free();
 		if(properties!=null) properties.free();
@@ -120,7 +123,7 @@ public class VkGpu implements VkGpuCtx{
 		
 		if(surfaceCapabilities!=null) surfaceCapabilities.free();
 		if(formats!=null) formats.free();
-		MemoryUtil.memFree(presentModes);
+		memFree(presentModes);
 		
 		if(graphicsPool!=null) graphicsPool.destroy();
 		if(transferPool!=null) transferPool.destroy();

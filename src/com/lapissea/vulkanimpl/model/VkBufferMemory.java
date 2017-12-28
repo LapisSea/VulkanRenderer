@@ -4,6 +4,7 @@ import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.simplevktypes.VkBuffer;
 import com.lapissea.vulkanimpl.simplevktypes.VkDeviceMemory;
+import com.lapissea.vulkanimpl.util.VkDestroyable;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkDevice;
@@ -14,7 +15,7 @@ import java.nio.ByteBuffer;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
-public class VkBufferMemory{
+public class VkBufferMemory implements VkDestroyable{
 	
 	private final VkBuffer       buffer;
 	private final VkDeviceMemory memory;
@@ -29,6 +30,7 @@ public class VkBufferMemory{
 	}
 	
 	
+	@Override
 	public void destroy(){
 		buffer.destroy();
 		memory.destroy();

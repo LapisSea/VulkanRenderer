@@ -10,12 +10,13 @@ import java.util.Objects;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkImageView extends ExtendableLong implements VkDestroyable, VkGpuCtx{
-	private final VkGpu gpu;
+	
+	private final VkGpuCtx gpuCtx;
 	
 	public VkImageView(VkGpuCtx gpuCtx, long val){
 		super(val);
-		gpu=gpuCtx.getGpu();
-		if(Vk.DEBUG) Objects.requireNonNull(gpu);
+		this.gpuCtx=gpuCtx;
+		if(Vk.DEBUG) Objects.requireNonNull(gpuCtx);
 	}
 	
 	@Override
@@ -26,6 +27,6 @@ public class VkImageView extends ExtendableLong implements VkDestroyable, VkGpuC
 	
 	@Override
 	public VkGpu getGpu(){
-		return gpu;
+		return gpuCtx.getGpu();
 	}
 }
