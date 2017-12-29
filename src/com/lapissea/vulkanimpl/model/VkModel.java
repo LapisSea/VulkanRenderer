@@ -20,6 +20,8 @@ public class VkModel implements VkDestroyable{
 		IndexType(int val, int bytes){
 			this.val=val;
 			this.bytes=bytes;
+			//node based scripting material
+			//nbsm
 		}
 	}
 	
