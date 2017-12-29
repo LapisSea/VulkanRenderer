@@ -36,4 +36,5 @@ public abstract class ExtendableLong extends Number implements Comparable<Extend
 	public double doubleValue(){
 		return val;
 	}
+	
 }

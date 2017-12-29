@@ -9,6 +9,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkMemoryRequirements;
 
+import java.nio.LongBuffer;
 import java.util.Objects;
 
 import static org.lwjgl.system.MemoryStack.*;
@@ -17,12 +18,14 @@ import static org.lwjgl.vulkan.VK10.*;
 public class VkBuffer extends ExtendableLong implements IMemoryAddressable, VkDestroyable, VkGpuCtx{
 	
 	private long alignment=-1;
-	private       long  size;
-	private final VkGpu gpu;
+	private       long       size;
+	private final VkGpu      gpu;
+	private final LongBuffer pointer;
 	
-	public VkBuffer(VkGpuCtx gpuCtx, long val, long size){
-		super(val);
+	public VkBuffer(VkGpuCtx gpuCtx, LongBuffer val, long size){
+		super(val.get(0));
 		this.size=size;
+		pointer=val;
 		gpu=gpuCtx.getGpu();
 		if(Vk.DEBUG) Objects.requireNonNull(gpu);
 	}
@@ -67,5 +70,9 @@ public class VkBuffer extends ExtendableLong implements IMemoryAddressable, VkDe
 	@Override
 	public VkGpu getGpu(){
 		return gpu;
+	}
+	
+	public LongBuffer pointer(){
+		return pointer;
 	}
 }

@@ -1,6 +1,5 @@
 package com.lapissea.vulkanimpl;
 
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vec.Vec2iFinal;
 import com.lapissea.vec.color.ColorM;
@@ -10,6 +9,7 @@ import com.lapissea.vulkanimpl.simplevktypes.*;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import com.lapissea.vulkanimpl.util.VkImageAspect;
+import com.lapissea.vulkanimpl.util.VkImageFormat;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
@@ -18,7 +18,6 @@ import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.Objects;
 
-import static com.lapissea.vulkanimpl.BufferUtil.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.KHRSurface.*;
@@ -162,7 +161,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 			for(int i=0;i<buffers.length;i++){
 				long image=images.get(i);
 				createInfo.image(image);
-				buffers[i]=new Buffer(new VkImage(gpu, image, imageSize.x(), imageSize.y(), createInfo.format()), Vk.createImageView(this, createInfo, lb));
+				buffers[i]=new Buffer(new VkImage(gpu, image, imageSize.x(), imageSize.y(), VkImageFormat.fromValue(createInfo.format())), Vk.createImageView(this, createInfo, lb));
 			}
 			VkGpu.Feature feature    =VkGpu.Feature.OPTIMAL;
 			int           depthFormat=gpu.anyFormat(feature, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT);
@@ -224,12 +223,10 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 			vkCmdSetScissor(cmd, 0, scissor);
 			
 			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.getGraphicsPipeline().get());
+			model.bind(cmd);
+			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.getPipelineLayout().get(), 0, stack.longs(shader.getDescriptorSet().get()), null);
 			
-			vkCmdBindVertexBuffers(cmd, 0, buffSingle(stack, model.getMemory().getBuffer()), buffSingle(stack, 0L));
-			vkCmdBindIndexBuffer(cmd, model.getMemory().getBuffer().get(), model.getDataSize(), model.getIndexFormat());
-			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.getPipelineLayout().get(), 0, buffSingle(stack, shader.getDescriptorSet()), null);
-			
-			vkCmdDrawIndexed(cmd, model.getVertexCount(), 1, 0, 0, 0);
+			model.draw(cmd);
 			
 			vkCmdEndRenderPass(cmd);
 			Vk.endCommandBuffer(cmd);

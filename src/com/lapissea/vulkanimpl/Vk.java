@@ -1,11 +1,11 @@
 package com.lapissea.vulkanimpl;
 
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vec.color.IColorM;
 import com.lapissea.vulkanimpl.simplevktypes.*;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
+import com.lapissea.vulkanimpl.util.VkImageFormat;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -144,8 +144,8 @@ public class Vk{
 	}
 	
 	public static VkPhysicalDevice[] getPhysicalDevices(MemoryStack stack, VkInstance instance){
-		IntBuffer ib         =stack.callocInt(1);
-		int       deviceCount=Vk.enumeratePhysicalDevices(instance, ib);
+		IntBuffer     ib             =stack.callocInt(1);
+		int           deviceCount    =Vk.enumeratePhysicalDevices(instance, ib);
 		PointerBuffer physicalDevices=stack.callocPointer(deviceCount);
 		Vk.enumeratePhysicalDevices(instance, ib, physicalDevices);
 		
@@ -425,10 +425,11 @@ public class Vk{
 		return dest.get(0);
 	}
 	
-	public static VkBuffer createBuffer(VkGpuCtx gpuCtx, VkBufferCreateInfo bufferInfo, LongBuffer dest){
-		int code=vkCreateBuffer(gpuCtx.getGpuDevice(), bufferInfo, null, dest);
+	public static VkBuffer createBuffer(VkGpuCtx gpuCtx, VkBufferCreateInfo bufferInfo){
+		LongBuffer dest=memAllocLong(1);
+		int        code=vkCreateBuffer(gpuCtx.getGpuDevice(), bufferInfo, null, dest);
 		if(DEBUG) check(code);
-		return new VkBuffer(gpuCtx, dest.get(0), bufferInfo.size());
+		return new VkBuffer(gpuCtx, dest, bufferInfo.size());
 	}
 	
 	public static VkDeviceMemory allocateMemory(VkGpuCtx gpuCtx, VkMemoryAllocateInfo allocInfo, LongBuffer dest){
@@ -471,6 +472,7 @@ public class Vk{
 		    .float32(3, src.a());
 		return dest;
 	}
+	
 	public static VkClearValue.Buffer clearDepth(VkClearValue.Buffer dest){
 //		dest.depthStencil().depth(1).stencil(0);
 		return dest;
@@ -555,7 +557,7 @@ public class Vk{
 	public static VkImage createImage(VkGpuCtx gpuCtx, VkImageCreateInfo imageInfo, LongBuffer dest){
 		int code=vkCreateImage(gpuCtx.getGpuDevice(), imageInfo, null, dest);
 		if(DEBUG) check(code);
-		return new VkImage(gpuCtx, dest.get(0), imageInfo.extent().width(), imageInfo.extent().height(), imageInfo.format());
+		return new VkImage(gpuCtx, dest.get(0), imageInfo.extent().width(), imageInfo.extent().height(), VkImageFormat.fromValue(imageInfo.format()));
 	}
 	
 	public static VkSampler createSampler(VkGpuCtx gpuCtx, VkSamplerCreateInfo samplerInfo, LongBuffer dest){

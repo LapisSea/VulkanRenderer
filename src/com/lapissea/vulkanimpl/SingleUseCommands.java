@@ -41,7 +41,7 @@ public class SingleUseCommands implements AutoCloseable{
 		Vk.queueSubmit(gpu.getTransferQueue(),
 		               VkSubmitInfo.callocStack(stack)
 		                           .sType(VK_STRUCTURE_TYPE_SUBMIT_INFO)
-		                           .pCommandBuffers(BufferUtil.buffSingle(stack, commandBuffer)),
+		                           .pCommandBuffers(stack.pointers(commandBuffer)),
 		               fence);
 		
 		Vk.queueWaitIdle(gpu.getTransferQueue());

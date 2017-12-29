@@ -5,6 +5,7 @@ import com.lapissea.vulkanimpl.simplevktypes.*;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import com.lapissea.vulkanimpl.util.VkImageAspect;
+import com.lapissea.vulkanimpl.util.VkImageFormat;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.lwjgl.PointerBuffer;
@@ -19,13 +20,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 
-import static com.lapissea.vulkanimpl.BufferUtil.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkGpu implements VkGpuCtx, VkDestroyable{
-	
 	
 	public enum Feature{
 		LINEAR(VK_IMAGE_TILING_LINEAR, f->f.linearTilingFeatures),
@@ -209,7 +208,7 @@ public class VkGpu implements VkGpuCtx, VkDestroyable{
 				int count=Vk.getPhysicalDeviceSurfacePresentModesKHR(physicalDevice, window, stack.callocInt(1));
 				presentModes=MemoryUtil.memAllocInt(count);
 				
-				if(count>0) Vk.getPhysicalDeviceSurfacePresentModesKHR(physicalDevice, window, buffSingle(stack, count), presentModes);
+				if(count>0) Vk.getPhysicalDeviceSurfacePresentModesKHR(physicalDevice, window, stack.ints(count), presentModes);
 			}
 		}
 		return presentModes;
@@ -389,7 +388,7 @@ public class VkGpu implements VkGpuCtx, VkDestroyable{
 	
 	public VkBuffer createBuffer(int size, int usage){
 		try(MemoryStack stack=stackPush()){
-			return Vk.createBuffer(this, Vk.bufferInfo(stack, size, usage), stack.mallocLong(1));
+			return Vk.createBuffer(this, Vk.bufferInfo(stack, size, usage));
 		}
 	}
 	
@@ -460,10 +459,33 @@ public class VkGpu implements VkGpuCtx, VkDestroyable{
 		}
 	}
 	
+	public VkImage createImage(int width, int height, VkImageFormat format, int usage){
+		try(MemoryStack stack=stackPush()){
+			VkImageCreateInfo imageInfo=VkImageCreateInfo.callocStack(stack);
+			imageInfo.sType(VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO)
+			         .imageType(VK_IMAGE_TYPE_2D)
+			         .mipLevels(1)
+			         .arrayLayers(1)
+			         .format(format.val)
+			         .tiling(VK_IMAGE_TILING_OPTIMAL)
+			         .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
+			         .usage(usage)
+			         .sharingMode(VK_SHARING_MODE_EXCLUSIVE)
+			         .samples(VK_SAMPLE_COUNT_1_BIT)
+			         .extent().set(width, height, 1);
+			return Vk.createImage(this, imageInfo, stack.mallocLong(1));
+		}
+	}
+	
 	public VkImage createImage(VkImageCreateInfo imageInfo){
 		try(MemoryStack stack=stackPush()){
 			return Vk.createImage(this, imageInfo, stack.mallocLong(1));
 		}
+	}
+	
+	public VkImageTexture createImageTexture(int width, int height, VkImageFormat format, int usage, int properties){
+		VkImage image=createImage(width, height, format, usage);
+		return new VkImageTexture(image, image.alocateMem(this, properties), image.byteSize);
 	}
 	
 	public VkImageTexture createImageTexture(VkImageCreateInfo imageInfo, int properties){
@@ -509,7 +531,7 @@ public class VkGpu implements VkGpuCtx, VkDestroyable{
 			createInfo.sType(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO)
 			          .image(image.get())
 			          .viewType(VK_IMAGE_VIEW_TYPE_2D)
-			          .format(image.format)
+			          .format(image.format.val)
 			          .subresourceRange().set(aspect.val, 0, 1, 0, 1);
 			
 			VkComponentMapping comps=createInfo.components();

@@ -13,7 +13,6 @@ import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.model.VkBufferMemory;
 import com.lapissea.vulkanimpl.model.VkModel;
 import com.lapissea.vulkanimpl.model.build.VkModelBuilder;
-import com.lapissea.vulkanimpl.model.build.VkModelUploader;
 import com.lapissea.vulkanimpl.simplevktypes.VkBuffer;
 import com.lapissea.vulkanimpl.simplevktypes.VkImage;
 import com.lapissea.vulkanimpl.simplevktypes.VkRenderPass;
@@ -39,7 +38,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import static com.lapissea.vulkanimpl.BufferUtil.*;
 import static com.lapissea.vulkanimpl.util.VkImageFormat.Format.*;
 import static com.lapissea.vulkanimpl.util.VkImageFormat.Type.*;
 import static org.lwjgl.glfw.GLFW.*;
@@ -92,8 +90,10 @@ public class VulkanRenderImpl{
 	private DataManager dataManager;
 	
 	public VulkanRenderImpl(){
-		
-		VkImageFormat.get(DEPTH, 24, false, NORM, STENCIL, 8, true, INT);
+
+//		VkImageFormat.get(DEPTH, 24, false, NORM, STENCIL, 8, false, INT);
+		LogUtil.println(VkImageFormat.fromValue(VK_FORMAT_D24_UNORM_S8_UINT).val, VK_FORMAT_D24_UNORM_S8_UINT);
+//		System.exit(0);
 		
 		dataManager=new DataManager();
 		dataManager.registerDomain(new File("res"));
@@ -103,6 +103,7 @@ public class VulkanRenderImpl{
 		
 		pickDevice();
 		
+		
 		imageAvailableSemaphore=gpu.createSemaphore();
 		renderFinishedSemaphore=gpu.createSemaphore();
 		
@@ -111,10 +112,11 @@ public class VulkanRenderImpl{
 		b.put(new Vec3f(+0.5F, -0.5F, +0.5F)).put(new ColorM(0, 1, 0, 1)).put(new Vec2f(0, 0)).done();
 		b.put(new Vec3f(+0.5F, +0.5F, +0.5F)).put(new ColorM(0, 0, 1, 1)).put(new Vec2f(0, 1)).done();
 		b.put(new Vec3f(-0.5F, +0.5F, +0.5F)).put(new ColorM(1, 1, 1, 1)).put(new Vec2f(1, 1)).done();
-		b.put(new Vec3f(-0.5F, -0.5F, -0.5F)).put(new ColorM(1, 0, 0, 1)).put(new Vec2f(1, 0)).done();
-		b.put(new Vec3f(+0.5F, -0.5F, -0.5F)).put(new ColorM(0, 1, 0, 1)).put(new Vec2f(0, 0)).done();
-		b.put(new Vec3f(+0.5F, +0.5F, -0.5F)).put(new ColorM(0, 0, 1, 1)).put(new Vec2f(0, 1)).done();
-		b.put(new Vec3f(-0.5F, +0.5F, -0.5F)).put(new ColorM(1, 1, 1, 1)).put(new Vec2f(1, 1)).done();
+		
+		b.put(new Vec3f(-0.5F, -0.5F, -0.5F)).put(new ColorM(1, 0, 0, 1)).put(new Vec2f(1, 1)).done();
+		b.put(new Vec3f(+0.5F, -0.5F, -0.5F)).put(new ColorM(0, 1, 0, 1)).put(new Vec2f(0, 1)).done();
+		b.put(new Vec3f(+0.5F, +0.5F, -0.5F)).put(new ColorM(0, 0, 1, 1)).put(new Vec2f(0, 0)).done();
+		b.put(new Vec3f(-0.5F, +0.5F, -0.5F)).put(new ColorM(1, 1, 1, 1)).put(new Vec2f(1, 0)).done();
 		b.indices(0, 1, 2,
 		          0, 2, 3,
 		
@@ -127,7 +129,7 @@ public class VulkanRenderImpl{
 		          2, 6, 7,
 		          3, 2, 7);
 		
-		model=VkModelUploader.upload(gpu, b);
+		model=b.upload(gpu);
 		
 		loadTexture();
 		
@@ -157,21 +159,7 @@ public class VulkanRenderImpl{
 			stagingMemory.flushMemory(gpu);
 			
 			
-			VkImageCreateInfo imageInfo=VkImageCreateInfo.callocStack(stack);
-			imageInfo.sType(VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO)
-			         .imageType(VK_IMAGE_TYPE_2D)
-			         .mipLevels(1)
-			         .arrayLayers(1)
-			         .format(VK_FORMAT_R8G8B8A8_UNORM)
-			         .tiling(VK_IMAGE_TILING_OPTIMAL)
-			         .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
-			         .usage(VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT)
-			         .sharingMode(VK_SHARING_MODE_EXCLUSIVE)
-			         .samples(VK_SAMPLE_COUNT_1_BIT)
-			         .extent().set(img.getWidth(), img.getHeight(), 1);
-			
-			
-			model.texture=gpu.createImageTexture(imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			model.texture=gpu.createImageTexture(img.getWidth(), img.getHeight(), VkImageFormat.get(RGBA, 8, false, NORM), VkImage.ON_GPU_TEXTURE, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			
 			
 			model.texture.image.transitionImageLayout(gpu, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -263,15 +251,15 @@ public class VulkanRenderImpl{
 		submitInfo.waitSemaphoreCount(1);
 		submitInfo.pWaitSemaphores(imageAvailableSemaphore.buff());
 		submitInfo.pSignalSemaphores(renderFinishedSemaphore.buff());
-		submitInfo.pWaitDstStageMask(buffSingle(stack, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT));
-		submitInfo.pCommandBuffers(buffSingle(stack, swapChain.getBuffer(imageIndex).getCmd()));
+		submitInfo.pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT));
+		submitInfo.pCommandBuffers(stack.pointers(swapChain.getBuffer(imageIndex).getCmd()));
 		
 		VkPresentInfoKHR presentInfo=VkPresentInfoKHR.callocStack(stack);
 		presentInfo.sType(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR);
 		presentInfo.pWaitSemaphores(submitInfo.pSignalSemaphores());
 		presentInfo.swapchainCount(1);
-		presentInfo.pSwapchains(buffSingle(stack, swapChain.getId()));
-		presentInfo.pImageIndices(buffSingle(stack, imageIndex));
+		presentInfo.pSwapchains(stack.longs(swapChain.getId()));
+		presentInfo.pImageIndices(stack.ints(imageIndex));
 		
 		vkQueueSubmit(gpu.getGraphicsQueue(), submitInfo, VK_NULL_HANDLE);
 		
@@ -336,7 +324,7 @@ public class VulkanRenderImpl{
 			           .finalLayout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 			attachments.get(1)
 			           .flags(0)
-			           .format(swapChain.getDepth().image.format)
+			           .format(swapChain.getDepth().image.format.val)
 			           .samples(VK_SAMPLE_COUNT_1_BIT)
 			           .loadOp(VK_ATTACHMENT_LOAD_OP_CLEAR)
 			           .storeOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)

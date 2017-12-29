@@ -6,6 +6,8 @@ import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
+import com.lapissea.vulkanimpl.util.VkImageAspect;
+import com.lapissea.vulkanimpl.util.VkImageFormat;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkImageMemoryBarrier;
@@ -19,31 +21,20 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public class VkImage extends ExtendableLong implements IMemoryAddressable, VkDestroyable, VkGpuCtx{
 	
+	public static final int ON_GPU_TEXTURE=VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT;
 	
-	public static int getFormatBytePerPixel(int format){
-		switch(format){
-		case VK_FORMAT_R8G8B8_UNORM:
-		case VK_FORMAT_D24_UNORM_S8_UINT:
-			return 3;
-		case VK_FORMAT_R8G8B8A8_UNORM:
-		case VK_FORMAT_R8G8B8A8_SRGB:
-		case VK_FORMAT_B8G8R8A8_UNORM:
-		case VK_FORMAT_D32_SFLOAT:
-		case VK_FORMAT_D32_SFLOAT_S8_UINT:
-			return 4;
-		}
-		throw new IllegalArgumentException("Unknown format: "+format);
-	}
+	public final  int           byteSize;
+	public final  int           width;
+	public final  int           height;
+	public final  VkImageFormat format;
+	private final VkGpu         gpu;
 	
-	public final int byteSize, width, height, format;
-	private final VkGpu gpu;
-	
-	public VkImage(VkGpuCtx gpuCtx, long val, int width, int height, int format){
+	public VkImage(VkGpuCtx gpuCtx, long val, int width, int height, VkImageFormat format){
 		super(val);
 		this.width=width;
 		this.height=height;
 		this.format=format;
-		byteSize=width*height*getFormatBytePerPixel(format);
+		byteSize=width*height*format.bytes();
 		gpu=gpuCtx.getGpu();
 		if(Vk.DEBUG) Objects.requireNonNull(gpu);
 	}
@@ -100,7 +91,7 @@ public class VkImage extends ExtendableLong implements IMemoryAddressable, VkDes
 			   .layerCount(1);
 			
 			if(newLayout==VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL){
-				if(hasStencilComponent(format)) srr.aspectMask(VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT);
+				if(format.hasAspect(VkImageAspect.STENCIL)) srr.aspectMask(VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT);
 				else srr.aspectMask(VK_IMAGE_ASPECT_DEPTH_BIT);
 			}else{
 				barrier.subresourceRange().aspectMask(VK_IMAGE_ASPECT_COLOR_BIT);

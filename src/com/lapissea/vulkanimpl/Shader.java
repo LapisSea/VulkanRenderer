@@ -6,7 +6,6 @@ import com.lapissea.vulkanimpl.model.VkBufferMemory;
 import com.lapissea.vulkanimpl.model.VkModel;
 import com.lapissea.vulkanimpl.simplevktypes.*;
 import org.joml.Matrix4f;
-import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
@@ -14,8 +13,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 
-import static com.lapissea.vulkanimpl.BufferUtil.*;
-import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class Shader{
@@ -118,7 +115,7 @@ public class Shader{
 			
 			VkPipelineDynamicStateCreateInfo dynamicState=VkPipelineDynamicStateCreateInfo.callocStack(stack);
 			dynamicState.sType(VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO);
-			dynamicState.pDynamicStates(BufferUtil.of(stack, VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_LINE_WIDTH, VK_DYNAMIC_STATE_SCISSOR).flip());
+			dynamicState.pDynamicStates(stack.ints(VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_LINE_WIDTH, VK_DYNAMIC_STATE_SCISSOR));
 			
 			
 			VkDescriptorSetLayoutBinding.Buffer uboLayoutBindings=VkDescriptorSetLayoutBinding.callocStack(2, stack);
@@ -144,7 +141,7 @@ public class Shader{
 			layoutInfo.pNext(0)
 			          .sType(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
 			          .pPushConstantRanges(null)
-			          .pSetLayouts(buffSingle(stack, layout));
+			          .pSetLayouts(stack.longs(layout.get()));
 			
 			pipelineLayout=Vk.createPipelineLayout(gpu, layoutInfo, stack.callocLong(1));
 			
@@ -263,7 +260,7 @@ public class Shader{
 			descriptorSet=Vk.allocateDescriptorSets(gpu.getDevice(), VkDescriptorSetAllocateInfo.callocStack(stack)
 			                                                                                    .sType(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO)
 			                                                                                    .descriptorPool(descriptorPool.get())
-			                                                                                    .pSetLayouts(buffSingle(stack, layout)), stack);
+			                                                                                    .pSetLayouts(stack.longs(layout.get())), stack);
 			
 			VkDescriptorBufferInfo.Buffer bufferInfo=VkDescriptorBufferInfo.callocStack(1, stack);
 			bufferInfo.get(0)
@@ -307,7 +304,7 @@ public class Shader{
 
 //		view.rotate((float)Math.cos((tim)%(Math.PI*2))/3, 0, 1, 0);
 //		view.rotate((float)Math.cos((tim*2)%(Math.PI*2))/3, 1, 1, 0);
-		view.translate(0, 0, -1F);
+		view.translate(0, 0, -0.65F);
 		view.rotate(1, 0, 0, 0);
 		
 		model.rotate((float)((tim/2)%(Math.PI*2)), 1, 0, 0);
