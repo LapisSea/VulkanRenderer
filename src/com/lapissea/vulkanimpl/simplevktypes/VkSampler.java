@@ -5,7 +5,6 @@ import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
-import org.lwjgl.vulkan.VkDevice;
 
 import java.util.Objects;
 
@@ -18,7 +17,7 @@ public class VkSampler extends ExtendableLong implements VkDestroyable, VkGpuCtx
 	public VkSampler(VkGpuCtx gpuCtx, long val){
 		super(val);
 		gpu=gpuCtx.getGpu();
-		if(Vk.DEBUG) Objects.requireNonNull(gpu);
+		if(Vk.DEVELOPMENT) Objects.requireNonNull(gpu);
 	}
 	
 	@Override

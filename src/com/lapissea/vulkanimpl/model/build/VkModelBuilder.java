@@ -61,9 +61,9 @@ public class VkModelBuilder{
 	
 	
 	private BufferBuilder get(Class attribute){
-		if(Vk.DEBUG&&typePos>=format.partCount()) throw new IllegalStateException("Attribute overflow");
+		if(Vk.DEVELOPMENT&&typePos>=format.partCount()) throw new IllegalStateException("Attribute overflow");
 		BufferBuilder attr=format.getAttribute(typePos);
-		if(Vk.DEBUG&&!attr.checkClass(attribute)) throw new IllegalArgumentException(attr+" can not accept "+attribute.getName());
+		if(Vk.DEVELOPMENT&&!attr.checkClass(attribute)) throw new IllegalArgumentException(attr+" can not accept "+attribute.getName());
 		typePos++;
 		return attr;
 	}
@@ -137,14 +137,14 @@ public class VkModelBuilder{
 	public int getIndexCount(){
 		return indices.size();
 	}
-
+	
 	public ByteBuffer exportData(ByteBuffer dest){
 		dest.put(data.toArray());
 		data.clear(vertex.capacity()*3);
-
+		
 		return dest;
 	}
-
+	
 	public ByteBuffer exportIndices(ByteBuffer dest){
 		if(indices.size()==0) return dest;
 		
@@ -200,15 +200,17 @@ public class VkModelBuilder{
 			VkBufferMemory memory       =gpu.createBufferMem(totalSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			
 			try(VkBufferMemory.MemorySession ses=stagingMemory.requestMemory(gpu.getDevice())){
-//				ses.memory.put(data.data(), 0, data.size());
-//				for(int i1=0;i1<indices.size();i1++){
-//					int i=indices.get(i1);
-//
-//					ses.memory.put((byte)(i&0xFF));
-//					ses.memory.put((byte)((i>>8)&0xFF));
-//				}
-				exportData(ses.memory);
-				exportIndices(ses.memory);
+				ses.memory.put(data.data(), 0, data.size());
+				if(meta.isIndexed()){
+					int[] indices=this.indices.data();
+					for(int i=0;i<this.indices.size();i++){
+						int id=indices[i];
+						for(int j=0;j<indexType.bytes;j++){
+							ses.memory.put((byte)(id&0xFF));
+							id>>=8;
+						}
+					}
+				}
 			}
 			
 			try(SingleUseCommands commands=new SingleUseCommands(stack, gpu)){

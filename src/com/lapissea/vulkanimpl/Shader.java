@@ -260,7 +260,7 @@ public class Shader{
 			descriptorSet=Vk.allocateDescriptorSets(gpu.getDevice(), VkDescriptorSetAllocateInfo.callocStack(stack)
 			                                                                                    .sType(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO)
 			                                                                                    .descriptorPool(descriptorPool.get())
-			                                                                                    .pSetLayouts(stack.longs(layout.get())), stack);
+			                                                                                    .pSetLayouts(stack.longs(layout.get())));
 			
 			VkDescriptorBufferInfo.Buffer bufferInfo=VkDescriptorBufferInfo.callocStack(1, stack);
 			bufferInfo.get(0)
@@ -319,6 +319,12 @@ public class Shader{
 		}
 	}
 	
+	
+	public void bind(VkCommandBuffer cmd){
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, getGraphicsPipeline().get());
+		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, getPipelineLayout().get(), 0, getDescriptorSet().pointer(), null);
+	}
+	
 	public void destroy(){
 		descriptorPool.destroy();
 		descriptorSetLayout.free();
@@ -331,6 +337,7 @@ public class Shader{
 		uniformBuffer.destroy();
 		graphicsPipeline.destroy();
 		pipelineLayout.destroy();
+		descriptorSet.destroy();
 		
 		gpu=null;
 		graphicsPipeline=null;

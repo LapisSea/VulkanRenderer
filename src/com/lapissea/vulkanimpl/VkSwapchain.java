@@ -82,7 +82,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	
 	public void create(VkGpu gpu){
 		check();
-		if(Vk.DEBUG) Objects.requireNonNull(gpu);
+		if(Vk.DEVELOPMENT) Objects.requireNonNull(gpu);
 		this.gpu=gpu;
 		
 		VkSurfaceCapabilitiesKHR caps       =gpu.getSurfaceCapabilities();
@@ -174,7 +174,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	
 	public void initCommandBuffers(MemoryStack stack, VkCommandPool commandPool, VkRenderPass renderPass, Shader shader, VkModel model, VkViewport.Buffer viewport){
 		check();
-		if(Vk.DEBUG){
+		if(Vk.DEVELOPMENT){
 			Objects.requireNonNull(stack);
 			Objects.requireNonNull(commandPool);
 			Objects.requireNonNull(renderPass);
@@ -222,9 +222,8 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 			vkCmdSetViewport(cmd, 0, viewport);
 			vkCmdSetScissor(cmd, 0, scissor);
 			
-			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.getGraphicsPipeline().get());
+			shader.bind(cmd);
 			model.bind(cmd);
-			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.getPipelineLayout().get(), 0, stack.longs(shader.getDescriptorSet().get()), null);
 			
 			model.draw(cmd);
 			

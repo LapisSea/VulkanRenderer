@@ -71,10 +71,10 @@ public class VkShaderCompiler{
 			int    endCut  =new File("").getAbsolutePath().length()+">exit".length()+n.length()*2;
 			String output  =out.toString().substring(startCut, out.length()-endCut);
 			if(!output.isEmpty()){
-				if(Vk.DEBUG){
+				if(Vk.DEVELOPMENT){
 					File f     =new File(glslSrcFile+".log");
 					File parent=f.getParentFile();
-					f=new File(parent, "DEBUG\\"+f.getName());
+					f=new File(parent, "DEVELOPMENT\\"+f.getName());
 					f.getParentFile().mkdirs();
 					
 					Files.write(f.toPath(), output.getBytes());

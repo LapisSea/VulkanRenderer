@@ -16,7 +16,7 @@ public class VkPipelineLayout extends ExtendableLong implements VkDestroyable, V
 	public VkPipelineLayout(VkGpuCtx gpuCtx, long val){
 		super(val);
 		gpu=gpuCtx.getGpu();
-		if(Vk.DEBUG) Objects.requireNonNull(gpu);
+		if(Vk.DEVELOPMENT) Objects.requireNonNull(gpu);
 	}
 	
 	@Override

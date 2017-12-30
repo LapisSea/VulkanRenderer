@@ -4,7 +4,6 @@ import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
-import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkPipelineShaderStageCreateInfo;
 import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 
@@ -22,7 +21,7 @@ public class VkShaderModule implements VkDestroyable, VkGpuCtx{
 	
 	public VkShaderModule(VkGpu gpu, Shader.Type type){
 		this.type=type;
-		if(Vk.DEBUG) Objects.requireNonNull(gpu);
+		if(Vk.DEVELOPMENT) Objects.requireNonNull(gpu);
 		this.gpu=gpu;
 	}
 	

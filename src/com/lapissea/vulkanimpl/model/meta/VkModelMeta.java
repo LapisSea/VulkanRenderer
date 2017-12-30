@@ -9,7 +9,7 @@ import java.nio.LongBuffer;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
-public abstract class VkModelMeta implements VkDestroyable{
+public abstract class VkModelMeta{
 	
 	public final int vertexCount, byteCount;
 	
@@ -17,10 +17,6 @@ public abstract class VkModelMeta implements VkDestroyable{
 		this.vertexCount=vertexCount;
 		this.byteCount=byteCount;
 	}
-	
-	
-	@Override
-	public void destroy(){}
 	
 	public abstract boolean isIndexed();
 	

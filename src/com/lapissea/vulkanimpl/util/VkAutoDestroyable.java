@@ -10,7 +10,7 @@ public class VkAutoDestroyable implements AutoCloseable{
 	
 	public VkAutoDestroyable(VkDestroyable... destroyables){
 		this.destroyables=destroyables;
-		if(Vk.DEBUG) Objects.requireNonNull(destroyables);
+		if(Vk.DEVELOPMENT) Objects.requireNonNull(destroyables);
 	}
 	
 	@Override

@@ -36,7 +36,7 @@ public class VkImage extends ExtendableLong implements IMemoryAddressable, VkDes
 		this.format=format;
 		byteSize=width*height*format.bytes();
 		gpu=gpuCtx.getGpu();
-		if(Vk.DEBUG) Objects.requireNonNull(gpu);
+		if(Vk.DEVELOPMENT) Objects.requireNonNull(gpu);
 	}
 	
 	@Override

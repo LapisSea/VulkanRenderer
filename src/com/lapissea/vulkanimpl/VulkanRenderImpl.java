@@ -51,7 +51,8 @@ public class VulkanRenderImpl{
 	
 	public static void main(String[] args){
 		System.setProperty("joml.nounsafe", "true");
-		
+		System.runFinalizersOnExit(true);
+
 		TextUtil.__REGISTER_CUSTOM_TO_STRING(VkExtent2D.class, e->e.getClass().getName()+"{h="+e.height()+", w="+e.height()+"}");
 		LogUtil.__.INIT(true, false, "log");
 		LogUtil.println("STARTED at "+Date.from(Instant.now()));
@@ -420,8 +421,8 @@ public class VulkanRenderImpl{
 		instance=Vk.createInstance(instanceCreateInfo, stack.mallocPointer(1));
 		window.createSurface(instance);
 		
-		if(Vk.DEBUG) debugReport=new VkDebugReport(instance, stack.mallocLong(1), stack, (type, prefix, code, message)->{
-//			if(type==VkDebugReport.Type.DEBUG) return;
+		if(Vk.DEVELOPMENT) debugReport=new VkDebugReport(instance, stack.mallocLong(1), stack, (type, prefix, code, message)->{
+//			if(type==VkDebugReport.Type.DEVELOPMENT) return;
 //			if(type==VkDebugReport.Type.INFORMATION) return;
 			if(message.startsWith("Device Extension")) return;
 			
@@ -489,7 +490,7 @@ public class VulkanRenderImpl{
 	}
 	
 	private void initLayers(MemoryStack stack){
-		if(!Vk.DEBUG) return;
+		if(!Vk.DEVELOPMENT) return;
 		
 		PointerBuffer layers=null;
 		lay:

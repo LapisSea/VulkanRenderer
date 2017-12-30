@@ -15,7 +15,7 @@ public class VkDebugReport{
 		else if((flags&EXTDebugReport.VK_DEBUG_REPORT_WARNING_BIT_EXT)!=0) type="WARNING";
 		else if((flags&EXTDebugReport.VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT)!=0) type="PERFORMANCE WARNING";
 		else if((flags&EXTDebugReport.VK_DEBUG_REPORT_ERROR_BIT_EXT)!=0) type="ERROR";
-		else if((flags&EXTDebugReport.VK_DEBUG_REPORT_DEBUG_BIT_EXT)!=0) type="DEBUG";
+		else if((flags&EXTDebugReport.VK_DEBUG_REPORT_DEBUG_BIT_EXT)!=0) type="DEVELOPMENT";
 		else type="UNKNOWN";*/
 	
 	public enum Type{
@@ -81,7 +81,7 @@ public class VkDebugReport{
 	
 	public VkDebugReport(VkInstance instance, LongBuffer lb, VkDebugReportCallbackCreateInfoEXT createInfo){
 		this.instance=instance;
-		this.callback=createDebugReportCallbackEXT(instance, createInfo, lb);
+		callback=createDebugReportCallbackEXT(instance, createInfo, lb);
 	}
 	
 	public void destroy(){
@@ -91,7 +91,7 @@ public class VkDebugReport{
 	
 	public static long createDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackCreateInfoEXT dbgCreateInfo, LongBuffer dest){
 		int code=EXTDebugReport.vkCreateDebugReportCallbackEXT(instance, dbgCreateInfo, null, dest);
-		if(Vk.DEBUG) Vk.check(code);
+		if(Vk.DEVELOPMENT) Vk.check(code);
 		return dest.get(0);
 	}
 	

@@ -4,7 +4,6 @@ import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
-import org.lwjgl.vulkan.VkDevice;
 
 import java.util.Objects;
 
@@ -16,7 +15,7 @@ public class VkFramebuffer extends ExtendableLong implements VkDestroyable, VkGp
 	
 	public VkFramebuffer(VkGpu gpu, long val){
 		super(val);
-		if(Vk.DEBUG) Objects.requireNonNull(gpu);
+		if(Vk.DEVELOPMENT) Objects.requireNonNull(gpu);
 		this.gpu=gpu;
 	}
 	

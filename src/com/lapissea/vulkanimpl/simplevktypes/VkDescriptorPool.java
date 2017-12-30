@@ -4,7 +4,6 @@ import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
-import org.lwjgl.vulkan.VkDevice;
 
 import java.util.Objects;
 
@@ -17,7 +16,7 @@ public class VkDescriptorPool extends ExtendableLong implements VkDestroyable, V
 	public VkDescriptorPool(VkGpuCtx gpuCtx, long val){
 		super(val);
 		gpu=gpuCtx.getGpu();
-		if(Vk.DEBUG) Objects.requireNonNull(gpu);
+		if(Vk.DEVELOPMENT) Objects.requireNonNull(gpu);
 	}
 	
 	@Override

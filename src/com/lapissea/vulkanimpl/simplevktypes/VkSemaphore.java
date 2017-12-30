@@ -19,7 +19,7 @@ public class VkSemaphore extends ExtendableLong implements VkDestroyable, VkGpuC
 	public VkSemaphore(VkGpu gpu, LongBuffer buff){
 		super(buff.get(0));
 		this.buff=buff;
-		if(Vk.DEBUG) Objects.requireNonNull(gpu);
+		if(Vk.DEVELOPMENT) Objects.requireNonNull(gpu);
 		this.gpu=gpu;
 	}
 	

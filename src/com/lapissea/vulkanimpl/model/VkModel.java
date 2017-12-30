@@ -42,7 +42,6 @@ public class VkModel implements VkDestroyable{
 	@Override
 	public void destroy(){
 		memory.destroy();
-		meta.destroy();
 	}
 	
 	public VkBufferMemory getMemory(){

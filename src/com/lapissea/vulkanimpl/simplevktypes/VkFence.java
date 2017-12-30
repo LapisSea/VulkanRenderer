@@ -38,7 +38,7 @@ public class VkFence extends ExtendableLong implements VkDestroyable, VkGpuCtx{
 		super(buff.get(0));
 		this.buff=buff;
 		gpu=gpuCtx.getGpu();
-		if(Vk.DEBUG) Objects.requireNonNull(gpu);
+		if(Vk.DEVELOPMENT) Objects.requireNonNull(gpu);
 	}
 	
 	private VkFence(LongBuffer buff){

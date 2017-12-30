@@ -1,6 +1,5 @@
 package com.lapissea.vulkanimpl.util;
 
-import com.lapissea.util.LogUtil;
 import com.lapissea.vulkanimpl.Vk;
 import org.lwjgl.vulkan.VK10;
 
@@ -55,7 +54,7 @@ public class VkImageFormat{
 			List<VkImageAspect> aspects=Arrays.stream(VkImageAspect.values())
 			                                  .filter(a->a.detectionPattern.matcher(name).find())
 			                                  .collect(Collectors.toList());
-			if(Vk.DEBUG&&aspects.isEmpty()) throw new RuntimeException("Unable to detect aspect at "+name+"!");
+			if(Vk.DEVELOPMENT&&aspects.isEmpty()) throw new RuntimeException("Unable to detect aspect at "+name+"!");
 			
 			VkImageFormat format=new VkImageFormat(name,
 			                                       VK10.class.getDeclaredField(name).getInt(null),

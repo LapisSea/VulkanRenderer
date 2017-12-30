@@ -16,7 +16,7 @@ public class VkImageView extends ExtendableLong implements VkDestroyable, VkGpuC
 	public VkImageView(VkGpuCtx gpuCtx, long val){
 		super(val);
 		this.gpuCtx=gpuCtx;
-		if(Vk.DEBUG) Objects.requireNonNull(gpuCtx);
+		if(Vk.DEVELOPMENT) Objects.requireNonNull(gpuCtx);
 	}
 	
 	@Override

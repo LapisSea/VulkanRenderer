@@ -1,9 +1,11 @@
 package com.lapissea.vulkanimpl.model.meta;
 
 import com.lapissea.util.LogUtil;
+import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkModelFormat;
 import com.lapissea.vulkanimpl.model.VkModel;
 import com.lapissea.vulkanimpl.simplevktypes.VkBuffer;
+import com.lapissea.vulkanimpl.util.DevelopmentMemorySafety;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkCommandBuffer;
 
@@ -17,8 +19,6 @@ public class VkModelMetaIndexed extends VkModelMeta{
 	
 	private final int indexCount, indexStart;
 	private final VkModel.IndexType indexType;
-	
-	private final LongBuffer offest=memAllocLong(1).put(0, 0);
 	
 	public VkModelMetaIndexed(int vertexCount, int byteCount, int indexCount, VkModel.IndexType indexType, VkModelFormat format){
 		super(vertexCount, byteCount);
@@ -36,7 +36,7 @@ public class VkModelMetaIndexed extends VkModelMeta{
 	public void bind(VkModel parent, VkCommandBuffer cmd){
 		VkBuffer buff=parent.getMemory().getBuffer();
 		try(MemoryStack stack=stackPush()){
-			vkCmdBindVertexBuffers(cmd, 0, stack.longs(buff.get()), offest);
+			vkCmdBindVertexBuffers(cmd, 0, stack.longs(buff.get()), stack.longs(0));
 			vkCmdBindIndexBuffer(cmd, buff.get(), indexStart, indexType.val);
 		}
 	}
@@ -55,8 +55,4 @@ public class VkModelMetaIndexed extends VkModelMeta{
 		return indexCount;
 	}
 	
-	@Override
-	public void destroy(){
-		memFree(offest);
-	}
 }

@@ -16,7 +16,7 @@ public class VkCommandPool extends ExtendableLong implements VkDestroyable, VkGp
 	public VkCommandPool(VkGpuCtx gpuCtx, long val){
 		super(val);
 		gpu=gpuCtx.getGpu();
-		if(Vk.DEBUG) Objects.requireNonNull(gpu);
+		if(Vk.DEVELOPMENT) Objects.requireNonNull(gpu);
 	}
 	
 	@Override
