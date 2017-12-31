@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>VulkanNutCracker</groupId>
 	<artifactId>VulkanNutCracker</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.0.1</version>
 	<build>
 		<sourceDirectory>src</sourceDirectory>
 		<plugins>
@@ -118,6 +118,26 @@
 			<artifactId>trove4j</artifactId>
 			<version>RELEASE</version>
 		</dependency>
+		<dependency>
+			<groupId>com.lapissea.util</groupId>
+			<artifactId>util</artifactId>
+			<version>1.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.lapissea.util</groupId>
+			<artifactId>vec</artifactId>
+			<version>1.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.lapissea.util</groupId>
+			<artifactId>data</artifactId>
+			<version>1.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.lapissea.util</groupId>
+			<artifactId>file</artifactId>
+			<version>1.0</version>
+		</dependency>
 	</dependencies>
 
 	<repositories>
@@ -126,6 +146,16 @@
 			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
 			<releases><enabled>false</enabled></releases>
 			<snapshots><enabled>true</enabled></snapshots>
+		</repository>
+		<repository>
+			<id>local</id>
+			<url>http://localhost/maven/</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
 		</repository>
 	</repositories>
 
