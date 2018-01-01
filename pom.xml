@@ -1,5 +1,5 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>VulkanNutCracker</groupId>
 	<artifactId>VulkanNutCracker</artifactId>
@@ -144,8 +144,12 @@
 		<repository>
 			<id>sonatype-snapshots</id>
 			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
-			<releases><enabled>false</enabled></releases>
-			<snapshots><enabled>true</enabled></snapshots>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
 		</repository>
 		<repository>
 			<id>local</id>
@@ -163,7 +167,9 @@
 		<profile>
 			<id>lwjgl-natives-linux</id>
 			<activation>
-				<os><family>unix</family></os>
+				<os>
+					<family>unix</family>
+				</os>
 			</activation>
 			<properties>
 				<lwjgl.natives>natives-linux</lwjgl.natives>
@@ -172,7 +178,9 @@
 		<profile>
 			<id>lwjgl-natives-macos</id>
 			<activation>
-				<os><family>mac</family></os>
+				<os>
+					<family>mac</family>
+				</os>
 			</activation>
 			<properties>
 				<lwjgl.natives>natives-macos</lwjgl.natives>
@@ -181,7 +189,9 @@
 		<profile>
 			<id>lwjgl-natives-windows</id>
 			<activation>
-				<os><family>windows</family></os>
+				<os>
+					<family>windows</family>
+				</os>
 			</activation>
 			<properties>
 				<lwjgl.natives>natives-windows</lwjgl.natives>

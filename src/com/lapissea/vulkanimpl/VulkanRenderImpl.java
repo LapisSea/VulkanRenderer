@@ -97,7 +97,8 @@ public class VulkanRenderImpl{
 //		System.exit(0);
 		
 		dataManager=new DataManager();
-		dataManager.registerDomain(new File("res"));
+//		dataManager.registerDomain(new File("res"));
+		dataManager.registerDomain(new File("res.zip"));
 		
 		initWindow();
 		Vk.stack(this::initVulkan);
@@ -149,7 +150,8 @@ public class VulkanRenderImpl{
 		
 		try(MemoryStack stack=stackPush()){
 			
-			BufferedImage img      =ImageIO.read(dataManager.getInStream("textures/SmugDude.png"));
+			BufferedImage img=ImageIO.read(LogUtil.printlnAndReturn(dataManager.getInStream("textures/SmugDude.png")));
+			
 			int           imageSize=img.getWidth()*img.getHeight()*4;
 			
 			VkBufferMemory stagingMemory=gpu.createBufferMem(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
