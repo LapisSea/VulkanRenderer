@@ -1,6 +1,7 @@
 package com.lapissea.vulkanimpl;
 
 import com.lapissea.datamanager.DataManager;
+import com.lapissea.datamanager.IDataManager;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -52,7 +53,7 @@ public class VulkanRenderImpl{
 	public static void main(String[] args){
 		System.setProperty("joml.nounsafe", "true");
 		System.runFinalizersOnExit(true);
-
+		
 		TextUtil.__REGISTER_CUSTOM_TO_STRING(VkExtent2D.class, e->e.getClass().getName()+"{h="+e.height()+", w="+e.height()+"}");
 		LogUtil.__.INIT(true, false, "log");
 		LogUtil.println("STARTED at "+Date.from(Instant.now()));
@@ -88,17 +89,19 @@ public class VulkanRenderImpl{
 	private VkSemaphore imageAvailableSemaphore;
 	private VkSemaphore renderFinishedSemaphore;
 	
-	private DataManager dataManager;
+	private DataManager  assets;
+	private IDataManager textures;
 	
 	public VulkanRenderImpl(){
 
 //		VkImageFormat.get(DEPTH, 24, false, NORM, STENCIL, 8, false, INT);
-		LogUtil.println(VkImageFormat.fromValue(VK_FORMAT_D24_UNORM_S8_UINT).val, VK_FORMAT_D24_UNORM_S8_UINT);
+//		LogUtil.println(VkImageFormat.fromValue(VK_FORMAT_D24_UNORM_S8_UINT).val, VK_FORMAT_D24_UNORM_S8_UINT);
 //		System.exit(0);
 		
-		dataManager=new DataManager();
-//		dataManager.registerDomain(new File("res"));
-		dataManager.registerDomain(new File("res.zip"));
+		assets=new DataManager();
+//		assets.registerDomain(new File("res"));
+		assets.registerDomain(new File("res.zip"));
+		textures=assets.subData("textures");
 		
 		initWindow();
 		Vk.stack(this::initVulkan);
@@ -150,9 +153,9 @@ public class VulkanRenderImpl{
 		
 		try(MemoryStack stack=stackPush()){
 			
-			BufferedImage img=ImageIO.read(LogUtil.printlnAndReturn(dataManager.getInStream("textures/SmugDude.png")));
+			BufferedImage img=ImageIO.read(textures.getInStream("SmugDude.png"));
 			
-			int           imageSize=img.getWidth()*img.getHeight()*4;
+			int imageSize=img.getWidth()*img.getHeight()*4;
 			
 			VkBufferMemory stagingMemory=gpu.createBufferMem(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			
