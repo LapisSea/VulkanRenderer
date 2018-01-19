@@ -10,6 +10,7 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import org.lwjgl.PointerBuffer;
@@ -23,6 +24,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
+import static com.lapissea.vulkanimpl.VulkanRenderer.*;
 import static org.lwjgl.vulkan.EXTDebugReport.*;
 import static org.lwjgl.vulkan.KHRDisplaySwapchain.*;
 import static org.lwjgl.vulkan.KHRSurface.*;
@@ -31,12 +33,10 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public class Vk{
 	
-	public static final boolean DEVELOPMENT=true;
-	
 	private static final TIntObjectMap<String> CODES=new TIntObjectHashMap<>();
 	
 	static{
-		if(DEVELOPMENT) Generator_Vk.run();
+//		if(DEVELOPMENT) Generator_Vk.run();
 		
 		CODES.put(VK_SUCCESS, "Command successfully completed.");
 		CODES.put(VK_NOT_READY, "A fence or query has not yet completed.");
@@ -104,7 +104,10 @@ public class Vk{
 	}
 	
 	public static void check(int code){
-		if(!DEVELOPMENT) throw new IllegalStateException();
+		if(!DEVELOPMENT) throw UtilL.uncheckedThrow(new IllegalAccessException("\n\n"+
+		                                                                       "\"check(int)\" can be used only for development debugging. \n"+
+		                                                                       "Calling this in production mode is a sign of bad design/performance. \n"+
+		                                                                       "Use \"if(DEVELOPMENT){...}\" to debug. (When DEVELOPMENT is false, it and its code will be removed by compiler optimization)\n"));
 		
 		if(code==VK_SUCCESS) return;
 		
@@ -231,7 +234,7 @@ public class Vk{
 		return dest.get(0);
 	}
 	
-	public static boolean getPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, int queueFamilyIndex, GlfwWindow window, IntBuffer dest){
+	public static boolean getPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, int queueFamilyIndex, GlfwWindowVk window, IntBuffer dest){
 		if(DEVELOPMENT){
 			Objects.requireNonNull(physicalDevice);
 			Objects.requireNonNull(window);

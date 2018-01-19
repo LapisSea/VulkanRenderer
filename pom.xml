@@ -120,6 +120,11 @@
 			<artifactId>trove4j</artifactId>
 			<version>RELEASE</version>
 		</dependency>
+		<dependency>
+			<groupId>GLFW-win</groupId>
+			<artifactId>GLFW-win</artifactId>
+			<version>0.0.1</version>
+		</dependency>
 		<!--<dependency>-->
 		<!--<groupId>com.lapissea.util</groupId>-->
 		<!--<artifactId>util</artifactId>-->

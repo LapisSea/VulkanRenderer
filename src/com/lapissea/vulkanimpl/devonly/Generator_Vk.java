@@ -1,10 +1,11 @@
-package com.lapissea.vulkanimpl;
+package com.lapissea.vulkanimpl.devonly;
 
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UnsafeConsumer;
 import com.lapissea.util.UtilL;
-import org.lwjgl.vulkan.VK10;
+import com.lapissea.vulkanimpl.Vk;
+import com.lapissea.vulkanimpl.VulkanRenderer;
 
 import java.io.*;
 import java.lang.reflect.Method;
@@ -15,7 +16,7 @@ import java.util.stream.Collectors;
 
 public class Generator_Vk{
 	
-	static{ if(!Vk.DEVELOPMENT) throw new RuntimeException(); }
+	static{ if(!VulkanRenderer.DEVELOPMENT) throw new RuntimeException(); }
 	
 	interface Gen{
 		void print(UnsafeConsumer<String, IOException> out) throws IOException;
