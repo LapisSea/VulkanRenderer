@@ -37,7 +37,7 @@ public class VulkanRenderer implements VkDestroyable{
 	}
 	
 	public void render(){
-	
+		VK10.VK_QUEUE_FAMILY_EXTERNAL_KHR
 	}
 	
 	public void createContext(GlfwWindowVk window){
