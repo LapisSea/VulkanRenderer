@@ -31,15 +31,19 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		
 		features=VkPhysicalDeviceFeatures.malloc();
 		vkGetPhysicalDeviceFeatures(physicalDevice, features);
+		
 	}
 	
-	public void init(){
+	public boolean init(){
+		if(logicalDevice!=null) return false;
 		
 		try(MemoryStack stack=stackPush()){
 			VkDeviceCreateInfo info=VkDeviceCreateInfo.callocStack(stack);
-			
+			info.sType(VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO);
 			logicalDevice=Vk.createDevice(physicalDevice, info, stack.mallocPointer(1));
 		}
+		
+		return true;
 	}
 	
 	@Override

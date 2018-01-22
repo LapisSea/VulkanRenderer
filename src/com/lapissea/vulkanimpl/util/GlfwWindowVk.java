@@ -16,9 +16,10 @@ public class GlfwWindowVk extends GlfwWindow{
 	}
 	
 	@Override
-	public void init(){
+	public GlfwWindowVk init(){
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		super.init();
+		return this;
 	}
 	
 	public void destroySurface(VulkanRenderer vk){

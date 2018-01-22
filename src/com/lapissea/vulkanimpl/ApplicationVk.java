@@ -24,7 +24,8 @@ public class ApplicationVk{
 		gameWindow.loadState(winSaveFile)
 		          .setTitle("Vulkan attempt 2")
 		          .setResizeable(true)
-		          .init();
+		          .init()
+		          .show();
 		
 		vkRenderer.createContext(gameWindow);
 	}

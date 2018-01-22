@@ -15,16 +15,16 @@ import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
-import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 
 import static com.lapissea.vulkanimpl.VulkanRenderer.*;
+import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.EXTDebugReport.*;
 import static org.lwjgl.vulkan.KHRDisplaySwapchain.*;
 import static org.lwjgl.vulkan.KHRSurface.*;
@@ -64,38 +64,34 @@ public class Vk{
 		CODES.put(VK_ERROR_VALIDATION_FAILED_EXT, "A validation layer found an error.");
 	}
 	
-	public static VkApplicationInfo initAppInfo(MemoryStack stack, String name){
-		ByteBuffer        nam       =stack.UTF8(name);
-		ByteBuffer        engineName=stack.UTF8("LapisEngine");
-		VkApplicationInfo info      =VkApplicationInfo.callocStack(stack);
+	public static VkApplicationInfo initAppInfo(MemoryStack stack, String applicationName, String applicationVersion, String engineName, String engineVersion){
+		
+		Function<String, Integer> version=s->{
+			String[] parts=s.split("\\.");
+			return VK_MAKE_VERSION(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
+		};
+		
+		VkApplicationInfo info=VkApplicationInfo.callocStack(stack);
 		info.sType(VK_STRUCTURE_TYPE_APPLICATION_INFO);
-		info.pNext(MemoryUtil.NULL);
-		info.pApplicationName(nam);
-		info.pEngineName(engineName);
-		info.applicationVersion(VK_MAKE_VERSION(0, 1, 0));
-		info.engineVersion(VK_MAKE_VERSION(0, 1, 0));
+		info.pApplicationName(stack.UTF8(applicationName));
+		info.pEngineName(stack.UTF8(engineName));
+		info.applicationVersion(version.apply(applicationVersion));
+		info.engineVersion(version.apply(engineVersion));
 		info.apiVersion(VK_API_VERSION_1_0);
 		return info;
 	}
 	
-	public static VkInstanceCreateInfo initInstanceInfo(MemoryStack stack, VkApplicationInfo app){
-		VkInstanceCreateInfo info=VkInstanceCreateInfo.callocStack(stack);
-		info.sType(VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO);
-		info.pNext(MemoryUtil.NULL);
-		info.flags(0);
-		info.pApplicationInfo(app);
-		info.ppEnabledExtensionNames(null);
-		info.ppEnabledLayerNames(null);
-		return info;
-	}
-	
-	public static VkInstance createInstance(VkInstanceCreateInfo instanceInfo, PointerBuffer pp){
-		int err=vkCreateInstance(instanceInfo, null, pp);
-		if(err==0) return new VkInstance(pp.get(0), instanceInfo);
-		if(err==VK_ERROR_INCOMPATIBLE_DRIVER) throw new IllegalStateException("Cannot find a compatible Vulkan installable client driver (ICD).");
-		if(err==VK_ERROR_EXTENSION_NOT_PRESENT) throw new IllegalStateException("Cannot find a specified extension library. Make sure your layers path is set appropriately.");
-		throw new IllegalStateException("vkCreateInstance failed. Do you have a compatible Vulkan installable client driver (ICD) installed?");
-		
+	public static VkInstance createInstance(VkInstanceCreateInfo instanceInfo){
+		PointerBuffer pp=memAllocPointer(1);
+		try{
+			int err=vkCreateInstance(instanceInfo, null, pp);
+			if(err==0) return new VkInstance(pp.get(0), instanceInfo);
+			if(err==VK_ERROR_INCOMPATIBLE_DRIVER) throw new IllegalStateException("Cannot find a compatible Vulkan installable client driver (ICD).");
+			if(err==VK_ERROR_EXTENSION_NOT_PRESENT) throw new IllegalStateException("Cannot find a specified extension library. Make sure your layers path is set appropriately.");
+			throw new IllegalStateException("vkCreateInstance failed. Do you have a compatible Vulkan installable client driver (ICD) installed?");
+		}finally{
+			memFree(pp);
+		}
 	}
 	
 	public static String translateCode(int code){
@@ -255,13 +251,13 @@ public class Vk{
 				size++;
 			}
 		}
-		return stringsToPP(strings, stack.callocPointer(size));
+		return size==0?null:stringsToPP(strings, stack.callocPointer(size));
 	}
 	
 	public static PointerBuffer stringsToPP(Iterable<? extends CharSequence> strings, PointerBuffer dest){
 		int i=0;
 		for(CharSequence s : strings){
-			dest.put(i++, MemoryUtil.memASCII(s));
+			dest.put(i++, memASCII(s));
 		}
 		return dest;
 	}
