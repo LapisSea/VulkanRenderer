@@ -9,6 +9,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
 
+import java.util.EventListener;
 import java.util.List;
 
 import static org.lwjgl.system.MemoryStack.*;
@@ -17,6 +18,8 @@ import static org.lwjgl.vulkan.VK10.*;
 public class VulkanRenderer implements VkDestroyable{
 	
 	public static final boolean DEVELOPMENT;
+	public static final String ENGINE_NAME   ="JLapisor";
+	public static final String ENGINE_VERSION="0.0.1";
 	
 	static{
 		String key="VulkanRenderer.devMode",
@@ -57,7 +60,7 @@ public class VulkanRenderer implements VkDestroyable{
 			
 			VkInstanceCreateInfo info=VkInstanceCreateInfo.callocStack(stack);
 			info.sType(VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO)
-			    .pApplicationInfo(Vk.initAppInfo(stack, window.getTitle(), "0.0.1", "JLapisor", "0.0.1"))
+			    .pApplicationInfo(Vk.initAppInfo(stack, window.getTitle(), "0.0.1", ENGINE_NAME, ENGINE_VERSION))
 			    .ppEnabledLayerNames(layers)
 			    .ppEnabledExtensionNames(extensions);
 			
