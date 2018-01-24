@@ -48,9 +48,9 @@ public class Vk{
 		
 		CODES.put(VK_ERROR_OUT_OF_HOST_MEMORY, "A host memory allocation has failed.");
 		CODES.put(VK_ERROR_OUT_OF_DEVICE_MEMORY, "A device memory allocation has failed.");
-		CODES.put(VK_ERROR_INITIALIZATION_FAILED, "Initialization of an object could not be completed for implementation-specific reasons.");
+		CODES.put(VK_ERROR_INITIALIZATION_FAILED, "Initialization of an bool could not be completed for implementation-specific reasons.");
 		CODES.put(VK_ERROR_DEVICE_LOST, "The logical or physical device has been lost.");
-		CODES.put(VK_ERROR_MEMORY_MAP_FAILED, "Mapping of a memory object has failed.");
+		CODES.put(VK_ERROR_MEMORY_MAP_FAILED, "Mapping of a memory bool has failed.");
 		CODES.put(VK_ERROR_LAYER_NOT_PRESENT, "A requested layer is not present or could not be loaded.");
 		CODES.put(VK_ERROR_EXTENSION_NOT_PRESENT, "A requested extension is not supported.");
 		CODES.put(VK_ERROR_FEATURE_NOT_PRESENT, "A requested feature is not supported.");

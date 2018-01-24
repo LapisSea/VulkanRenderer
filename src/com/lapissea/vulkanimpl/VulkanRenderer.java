@@ -9,7 +9,6 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
 
-import java.util.EventListener;
 import java.util.List;
 
 import static org.lwjgl.system.MemoryStack.*;
@@ -60,7 +59,7 @@ public class VulkanRenderer implements VkDestroyable{
 			
 			VkInstanceCreateInfo info=VkInstanceCreateInfo.callocStack(stack);
 			info.sType(VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO)
-			    .pApplicationInfo(Vk.initAppInfo(stack, window.getTitle(), "0.0.1", ENGINE_NAME, ENGINE_VERSION))
+			    .pApplicationInfo(Vk.initAppInfo(stack, window.title.get(), "0.0.1", ENGINE_NAME, ENGINE_VERSION))
 			    .ppEnabledLayerNames(layers)
 			    .ppEnabledExtensionNames(extensions);
 			

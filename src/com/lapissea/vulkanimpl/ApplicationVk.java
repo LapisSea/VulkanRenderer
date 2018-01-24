@@ -4,7 +4,6 @@ import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 
 import java.io.File;
-import java.util.stream.Stream;
 
 public class ApplicationVk{
 	
@@ -20,11 +19,10 @@ public class ApplicationVk{
 	
 	public void init(){
 		Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "shutdown-thread"));
-		
-		gameWindow.loadState(winSaveFile)
-		          .setTitle("Vulkan attempt 2")
-		          .setResizeable(true)
-		          .init()
+		gameWindow.loadState(winSaveFile);
+		gameWindow.maximized.set(true);
+		gameWindow.title.set("Vulkan attempt 2");
+		gameWindow.init()
 		          .show();
 		
 		vkRenderer.createContext(gameWindow);
@@ -47,11 +45,7 @@ public class ApplicationVk{
 	}
 	
 	private void shutdown(){
-		Stream.of(
-			(Runnable)()->gameWindow.loadState(winSaveFile),
-			()->{
-			
-			}).parallel().forEach(Runnable::run);
+		gameWindow.saveState(winSaveFile);
 	}
 	
 }
