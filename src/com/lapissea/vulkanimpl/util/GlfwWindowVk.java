@@ -28,7 +28,7 @@ public class GlfwWindowVk extends GlfwWindow{
 	
 	public void createSurface(VulkanRenderer vk){
 		long[] result={0};
-		int    code  =glfwCreateWindowSurface(vk.getInstance(), id, null, result);
+		int    code  =glfwCreateWindowSurface(vk.getInstance(), handle, null, result);
 		surface=result[0];
 	}
 	

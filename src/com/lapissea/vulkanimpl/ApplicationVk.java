@@ -1,5 +1,6 @@
 package com.lapissea.vulkanimpl;
 
+import com.lapissea.glfwwin.GlfwMonitor;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 
@@ -18,12 +19,15 @@ public class ApplicationVk{
 	}
 	
 	public void init(){
+		GlfwMonitor.init();
+		
 		Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "shutdown-thread"));
 		gameWindow.loadState(winSaveFile);
-		gameWindow.maximized.set(true);
 		gameWindow.title.set("Vulkan attempt 2");
+		gameWindow.monitor.set(GlfwMonitor.getMonitors().get(1));
 		gameWindow.init()
 		          .show();
+		
 		
 		vkRenderer.createContext(gameWindow);
 	}
