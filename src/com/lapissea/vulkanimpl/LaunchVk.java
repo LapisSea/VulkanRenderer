@@ -8,7 +8,7 @@ public class LaunchVk{
 	public static void main(String[] args){
 		sysProps();
 		
-		LogUtil.__.create(true,false,null);
+		LogUtil.__.create(true,false,"log");
 		
 		new ApplicationVk();
 	}

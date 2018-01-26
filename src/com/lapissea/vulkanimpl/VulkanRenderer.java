@@ -4,11 +4,13 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
+import javafx.beans.binding.When;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.lwjgl.system.MemoryStack.*;
@@ -53,9 +55,15 @@ public class VulkanRenderer implements VkDestroyable{
 		this.window=window;
 		try(MemoryStack stack=stackPush()){
 			
-			PointerBuffer
-				layers=Vk.stringsToPP(List.of(), stack),
-				extensions=Vk.stringsToPP(List.of(), stack);
+			PointerBuffer layers=null, extensions=null;
+			
+			if(DEVELOPMENT){
+				List<String> layerNames    =new ArrayList<>();
+				List<String> extensionNames=new ArrayList<>();
+				
+				layers=Vk.stringsToPP(layerNames, stack);
+				extensions=Vk.stringsToPP(extensionNames, stack);
+			}
 			
 			VkInstanceCreateInfo info=VkInstanceCreateInfo.callocStack(stack);
 			info.sType(VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO)
