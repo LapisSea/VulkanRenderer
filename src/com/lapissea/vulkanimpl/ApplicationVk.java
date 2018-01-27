@@ -4,7 +4,6 @@ import com.lapissea.datamanager.DataManager;
 import com.lapissea.datamanager.IDataManager;
 import com.lapissea.glfwwin.GlfwMonitor;
 import com.lapissea.glfwwin.GlfwWindow;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import org.lwjgl.glfw.GLFWImage;
@@ -29,6 +28,7 @@ public class ApplicationVk{
 	private IDataManager textures;
 	
 	public ApplicationVk(){
+//		LogUtil.println(new Rectangle2D.Float(1,1,2,2).createIntersection(new Rectangle2D.Float(0,0,2,2)));
 		init();
 		while(run()) ;
 		destroy();
@@ -38,9 +38,8 @@ public class ApplicationVk{
 		
 		manger=new DataManager();
 		try{
-			File jar=new File(ApplicationVk.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
-			LogUtil.println(jar);
-			manger.registerDomain(jar);
+			File root=new File(ApplicationVk.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
+			manger.registerDomain(root);
 		}catch(URISyntaxException e){}
 		
 		textures=manger.subData("assets/textures");
@@ -55,11 +54,10 @@ public class ApplicationVk{
 		          .show();
 		
 		gameWindow.setIcon(
-			textures.getDirPathsS("icon")
+			textures.getDirNamesS("icon")
 			        .parallel()
 			        .map(fileName->{
 				        try{
-				        	LogUtil.println(fileName);
 					        String name=fileName.substring(fileName.lastIndexOf(File.separatorChar)+1, fileName.lastIndexOf('.'));
 					        int    res =Integer.parseInt(name);
 					

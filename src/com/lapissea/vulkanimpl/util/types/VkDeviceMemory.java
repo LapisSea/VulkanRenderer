@@ -2,7 +2,6 @@ package com.lapissea.vulkanimpl.util.types;
 
 import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
-import com.lapissea.vulkanimpl.VulkanRenderer;
 import com.lapissea.vulkanimpl.util.VkBufferedLong;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.vulkan.VkMemoryAllocateInfo;
@@ -26,7 +25,7 @@ public class VkDeviceMemory extends VkBufferedLong implements VkGpuCtx{
 		VkGpu      gpu=ctx.getGpu();
 		LongBuffer lb =memAllocLong(1);
 		
-		int code=vkAllocateMemory(gpu.getDevice(), info, gpu.getAllocator(), lb);
+		int code=vkAllocateMemory(gpu.getDevice(), info, gpu.getInstance().getAllocator(), lb);
 		if(DEVELOPMENT) Vk.check(code);
 		
 		return new VkDeviceMemory(lb, gpu);
@@ -34,7 +33,7 @@ public class VkDeviceMemory extends VkBufferedLong implements VkGpuCtx{
 	
 	@Override
 	public void destroy(){
-		vkFreeMemory(gpu.getDevice(), buff.get(0), gpu.getAllocator());
+		vkFreeMemory(gpu.getDevice(), buff.get(0), gpu.getInstance().getAllocator());
 		super.destroy();
 	}
 	

@@ -2,17 +2,20 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.vulkanimpl.devonly.ValidationLayers;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
-import javafx.beans.binding.When;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.VkAllocationCallbacks;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
+import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -21,6 +24,8 @@ public class VulkanRenderer implements VkDestroyable{
 	public static final boolean DEVELOPMENT;
 	public static final String ENGINE_NAME   ="JLapisor";
 	public static final String ENGINE_VERSION="0.0.1";
+	
+	private VkAllocationCallbacks allocator;
 	
 	static{
 		String key="VulkanRenderer.devMode",
@@ -44,7 +49,6 @@ public class VulkanRenderer implements VkDestroyable{
 	private GlfwWindowVk window;
 	
 	public VulkanRenderer(){
-	
 	}
 	
 	public void render(){
@@ -55,23 +59,25 @@ public class VulkanRenderer implements VkDestroyable{
 		this.window=window;
 		try(MemoryStack stack=stackPush()){
 			
-			PointerBuffer layers=null, extensions=null;
+			
+			List<String> layerNames    =new ArrayList<>();
+			List<String> extensionNames=new ArrayList<>();
 			
 			if(DEVELOPMENT){
-				List<String> layerNames    =new ArrayList<>();
-				List<String> extensionNames=new ArrayList<>();
-				
-				layers=Vk.stringsToPP(layerNames, stack);
-				extensions=Vk.stringsToPP(extensionNames, stack);
+				ValidationLayers.addLayers(layerNames);
+				ValidationLayers.layerSupport(layerNames);
 			}
+			
+			PointerBuffer requ=glfwGetRequiredInstanceExtensions();
+			Stream.generate(requ::getStringUTF8).limit(requ.limit()).forEach(extensionNames::add);
 			
 			VkInstanceCreateInfo info=VkInstanceCreateInfo.callocStack(stack);
 			info.sType(VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO)
 			    .pApplicationInfo(Vk.initAppInfo(stack, window.title.get(), "0.0.1", ENGINE_NAME, ENGINE_VERSION))
-			    .ppEnabledLayerNames(layers)
-			    .ppEnabledExtensionNames(extensions);
+			    .ppEnabledLayerNames(Vk.stringsToPP(layerNames, stack))
+			    .ppEnabledExtensionNames(Vk.stringsToPP(extensionNames, stack));
 			
-			instance=Vk.createInstance(info);
+			instance=Vk.createInstance(info, allocator);
 		}
 	}
 	
@@ -87,9 +93,13 @@ public class VulkanRenderer implements VkDestroyable{
 		return computeGpu;
 	}
 	
+	public VkAllocationCallbacks getAllocator(){
+		return allocator;
+	}
+	
 	@Override
 	public void destroy(){
-	
+		vkDestroyInstance(instance, allocator);
 	}
 	
 }

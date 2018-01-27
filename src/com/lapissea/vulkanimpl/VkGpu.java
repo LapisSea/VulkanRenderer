@@ -1,6 +1,5 @@
 package com.lapissea.vulkanimpl;
 
-import com.lapissea.glfwwin.GlfwWindow;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.system.MemoryStack;
@@ -11,9 +10,7 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public class VkGpu implements VkDestroyable, VkGpuCtx{
 	
-	private final GlfwWindow window;
-	
-	private VkAllocationCallbacks allocator;
+	private final VulkanRenderer instance;
 	
 	private final VkPhysicalDevice physicalDevice;
 	private       VkDevice         logicalDevice;
@@ -22,8 +19,8 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	private VkPhysicalDeviceFeatures         features;
 	
 	
-	public VkGpu(GlfwWindow window, VkPhysicalDevice physicalDevice){
-		this.window=window;
+	public VkGpu(VulkanRenderer instance, VkPhysicalDevice physicalDevice){
+		this.instance=instance;
 		this.physicalDevice=physicalDevice;
 		
 		memoryProperties=VkPhysicalDeviceMemoryProperties.malloc();
@@ -40,7 +37,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		try(MemoryStack stack=stackPush()){
 			VkDeviceCreateInfo info=VkDeviceCreateInfo.callocStack(stack);
 			info.sType(VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO);
-			logicalDevice=Vk.createDevice(physicalDevice, info, stack.mallocPointer(1));
+			logicalDevice=Vk.createDevice(physicalDevice, info, instance.getAllocator(), stack.mallocPointer(1));
 		}
 		
 		return true;
@@ -50,7 +47,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	public void destroy(){
 		
 		if(logicalDevice!=null){
-			vkDestroyDevice(logicalDevice, allocator);
+			vkDestroyDevice(logicalDevice, instance.getAllocator());
 			
 		}
 		
@@ -83,11 +80,11 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		return features;
 	}
 	
-	public VkAllocationCallbacks getAllocator(){
-		return allocator;
-	}
-	
 	public VkPhysicalDeviceMemoryProperties getMemoryProperties(){
 		return memoryProperties;
+	}
+	
+	public VulkanRenderer getInstance(){
+		return instance;
 	}
 }

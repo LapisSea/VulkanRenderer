@@ -81,10 +81,10 @@ public class Vk{
 		return info;
 	}
 	
-	public static VkInstance createInstance(VkInstanceCreateInfo instanceInfo){
+	public static VkInstance createInstance(VkInstanceCreateInfo instanceInfo, VkAllocationCallbacks allocator){
 		PointerBuffer pp=memAllocPointer(1);
 		try{
-			int err=vkCreateInstance(instanceInfo, null, pp);
+			int err=vkCreateInstance(instanceInfo, allocator, pp);
 			if(err==0) return new VkInstance(pp.get(0), instanceInfo);
 			if(err==VK_ERROR_INCOMPATIBLE_DRIVER) throw new IllegalStateException("Cannot find a compatible Vulkan installable client driver (ICD).");
 			if(err==VK_ERROR_EXTENSION_NOT_PRESENT) throw new IllegalStateException("Cannot find a specified extension library. Make sure your layers path is set appropriately.");
@@ -143,7 +143,7 @@ public class Vk{
 	public static VkExtensionProperties.Buffer getDeviceExtensionProperties(MemoryStack stack, VkPhysicalDevice physicalDevice, IntBuffer dest){
 		int count=enumerateDeviceExtensionProperties(physicalDevice, dest);
 		
-		VkExtensionProperties.Buffer properties=stack==null?VkExtensionProperties.calloc(count):VkExtensionProperties.callocStack(count, stack);
+		VkExtensionProperties.Buffer properties=VkExtensionProperties.callocStack(count, stack);
 		enumerateDeviceExtensionProperties(physicalDevice, null, dest, properties);
 		
 		return properties;
@@ -199,12 +199,11 @@ public class Vk{
 		return dest.get(0);
 	}
 	
-	public static VkLayerProperties.Buffer enumerateInstanceLayerProperties(MemoryStack stack, IntBuffer dest){
-		int count=enumerateInstanceLayerProperties(dest, null);
-		if(count==0) return null;
+	public static VkLayerProperties.Buffer enumerateInstanceLayerProperties(MemoryStack stack){
+		IntBuffer ib=stack.mallocInt(1);
 		
-		VkLayerProperties.Buffer layers=stack==null?VkLayerProperties.calloc(count):VkLayerProperties.callocStack(count, stack);
-		enumerateInstanceLayerProperties(dest, layers);
+		VkLayerProperties.Buffer layers=VkLayerProperties.callocStack(enumerateInstanceLayerProperties(ib, null), stack);
+		enumerateInstanceLayerProperties(ib, layers);
 		return layers;
 	}
 	
@@ -214,8 +213,8 @@ public class Vk{
 		return dest.get(0);
 	}
 	
-	public static VkDevice createDevice(VkPhysicalDevice physicalDevice, VkDeviceCreateInfo deviceCreateInfo, PointerBuffer pp){
-		int code=vkCreateDevice(physicalDevice, deviceCreateInfo, null, pp);
+	public static VkDevice createDevice(VkPhysicalDevice physicalDevice, VkDeviceCreateInfo deviceCreateInfo, VkAllocationCallbacks allocator, PointerBuffer pp){
+		int code=vkCreateDevice(physicalDevice, deviceCreateInfo, allocator, pp);
 		if(DEVELOPMENT) check(code);
 		return new VkDevice(pp.get(0), physicalDevice, deviceCreateInfo);
 	}
