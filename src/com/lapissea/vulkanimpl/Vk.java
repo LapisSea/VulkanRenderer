@@ -184,12 +184,11 @@ public class Vk{
 		return dest.get(0);
 	}
 	
-	public static VkExtensionProperties.Buffer enumerateInstanceExtensionProperties(MemoryStack stack, IntBuffer dest){
-		int count=enumerateInstanceExtensionProperties(null, dest, null);
-		if(count==0) return null;
+	public static VkExtensionProperties.Buffer enumerateInstanceExtensionProperties(MemoryStack stack){
+		IntBuffer ib=stack.mallocInt(1);
 		
-		VkExtensionProperties.Buffer extensions=VkExtensionProperties.callocStack(count, stack);
-		enumerateInstanceExtensionProperties(null, dest, extensions);
+		VkExtensionProperties.Buffer extensions=VkExtensionProperties.callocStack(enumerateInstanceExtensionProperties(null, ib, null), stack);
+		enumerateInstanceExtensionProperties(null, ib, extensions);
 		return extensions;
 	}
 	

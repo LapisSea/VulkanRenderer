@@ -22,22 +22,6 @@ public class ValidationLayers{
 	}
 	
 	
-	public static void layerSupport(Collection<String> layers){
-		try(MemoryStack stack=stackPush()){
-			List<String> props=Vk.enumerateInstanceLayerProperties(stack).stream()
-			                     .map(VkLayerProperties::layerNameString)
-			                     .collect(Collectors.toList());
-			
-			String fails=layers.stream()
-			                   .filter(l->!props.contains(l))
-			                   .map(s->s==null?"<NULL_STRING>":s.isEmpty()?"<EMPTY_STRING>":s)
-			                   .collect(Collectors.joining(", "));
-			
-			if(!fails.isEmpty()) throw new IllegalStateException("Layers not supported: "+fails);
-		}
-		
-	}
-	
 	public static void initLogging(){
 	
 	}

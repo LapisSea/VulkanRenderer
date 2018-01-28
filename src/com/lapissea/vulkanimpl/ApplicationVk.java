@@ -28,7 +28,6 @@ public class ApplicationVk{
 	private IDataManager textures;
 	
 	public ApplicationVk(){
-//		LogUtil.println(new Rectangle2D.Float(1,1,2,2).createIntersection(new Rectangle2D.Float(0,0,2,2)));
 		init();
 		while(run()) ;
 		destroy();
