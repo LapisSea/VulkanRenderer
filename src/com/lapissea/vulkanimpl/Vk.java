@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import static com.lapissea.vulkanimpl.VulkanRenderer.*;
+import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.EXTDebugReport.*;
 import static org.lwjgl.vulkan.KHRDisplaySwapchain.*;
@@ -123,8 +124,9 @@ public class Vk{
 	}
 	
 	public static VkPhysicalDevice[] getPhysicalDevices(MemoryStack stack, VkInstance instance){
-		IntBuffer     ib             =stack.callocInt(1);
-		int           deviceCount    =Vk.enumeratePhysicalDevices(instance, ib);
+		IntBuffer ib         =stack.callocInt(1);
+		int       deviceCount=Vk.enumeratePhysicalDevices(instance, ib);
+		if(deviceCount==0) return new VkPhysicalDevice[deviceCount];
 		PointerBuffer physicalDevices=stack.callocPointer(deviceCount);
 		Vk.enumeratePhysicalDevices(instance, ib, physicalDevices);
 		
@@ -157,26 +159,6 @@ public class Vk{
 		int code=vkEnumerateDeviceExtensionProperties(physicalDevice, layerName, dest, properties);
 		if(DEVELOPMENT) check(code);
 		return dest.get(0);
-	}
-	
-	public static VkQueueFamilyProperties.Buffer getPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice physicalDevice, IntBuffer dest){
-		
-		int count=getPhysicalDeviceQueueFamilyProperties(physicalDevice, dest, null);
-		
-		VkQueueFamilyProperties.Buffer result=VkQueueFamilyProperties.calloc(count);
-		
-		if(getPhysicalDeviceQueueFamilyProperties(physicalDevice, dest, result)==0) throw new IllegalStateException();
-		return result;
-	}
-	
-	public static VkQueueFamilyProperties.Buffer getPhysicalDeviceQueueFamilyProperties(MemoryStack stack, VkPhysicalDevice physicalDevice, IntBuffer dest){
-		
-		int count=getPhysicalDeviceQueueFamilyProperties(physicalDevice, dest, null);
-		
-		VkQueueFamilyProperties.Buffer result=VkQueueFamilyProperties.callocStack(count, stack);
-		
-		if(getPhysicalDeviceQueueFamilyProperties(physicalDevice, dest, result)==0) throw new IllegalStateException();
-		return result;
 	}
 	
 	public static int getPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice physicalDevice, IntBuffer dest, VkQueueFamilyProperties.Buffer pQueueFamilyProperties){

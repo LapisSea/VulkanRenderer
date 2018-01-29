@@ -4,6 +4,7 @@ import com.lapissea.datamanager.DataManager;
 import com.lapissea.datamanager.IDataManager;
 import com.lapissea.glfwwin.GlfwMonitor;
 import com.lapissea.glfwwin.GlfwWindow;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import org.lwjgl.glfw.GLFWImage;
@@ -15,6 +16,7 @@ import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.util.Objects;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 public class ApplicationVk{
 	
@@ -28,6 +30,9 @@ public class ApplicationVk{
 	private IDataManager textures;
 	
 	public ApplicationVk(){
+		
+		Stream.of(true, false, true, false).sorted(Boolean::compare).forEach(LogUtil::println);
+		
 		init();
 		while(run()) ;
 		destroy();
@@ -91,6 +96,7 @@ public class ApplicationVk{
 	
 	public void destroy(){
 		gameWindow.hide();
+		vkRenderer.destroy();
 		gameWindow.destroy();
 	}
 	

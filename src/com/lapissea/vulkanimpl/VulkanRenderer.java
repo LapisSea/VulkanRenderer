@@ -1,8 +1,10 @@
 package com.lapissea.vulkanimpl;
 
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.devonly.ValidationLayers;
+import com.lapissea.vulkanimpl.devonly.VkDebugReport;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import org.lwjgl.PointerBuffer;
@@ -10,14 +12,16 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
-import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.EXTDebugReport.*;
+import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VulkanRenderer implements VkDestroyable{
@@ -27,6 +31,7 @@ public class VulkanRenderer implements VkDestroyable{
 	public static final String ENGINE_VERSION="0.0.1";
 	
 	private VkAllocationCallbacks allocator;
+	private VkDebugReport         debugReport;
 	
 	static{
 		String key="VulkanRenderer.devMode",
@@ -58,43 +63,128 @@ public class VulkanRenderer implements VkDestroyable{
 	
 	public void createContext(GlfwWindowVk window){
 		this.window=window;
+		
 		try(MemoryStack stack=stackPush()){
 			
 			
 			List<String> layerNames=new ArrayList<>(), extensionNames=new ArrayList<>();
 			
-			if(DEVELOPMENT){
-				ValidationLayers.addLayers(layerNames);
-				
-				extensionNames.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-			}
-			
-			PointerBuffer requ=glfwGetRequiredInstanceExtensions();
-			Stream.generate(requ::getStringUTF8).limit(requ.limit()).forEach(extensionNames::add);
-			
-			
-			BiFunction<List<String>, List<String>, Void> check=(supported, requested)->{
-				String fails=requested.stream()
-				                      .filter(l->!supported.contains(l))
-				                      .map(s->s==null?"<NULL_STRING>":s.isEmpty()?"<EMPTY_STRING>":s)
-				                      .collect(Collectors.joining(", "));
-				
-				if(!fails.isEmpty()) throw new IllegalStateException("Not supported: "+fails);
-				return null;
-			};
-			
-			check.apply(Vk.enumerateInstanceLayerProperties(stack).stream().map(VkLayerProperties::layerNameString).collect(Collectors.toList()), layerNames);
-			check.apply(Vk.enumerateInstanceExtensionProperties(stack).stream().map(VkExtensionProperties::extensionNameString).collect(Collectors.toList()), extensionNames);
-			
+			initAddons(stack, layerNames, extensionNames);
 			
 			VkInstanceCreateInfo info=VkInstanceCreateInfo.callocStack(stack);
 			info.sType(VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO)
-			    .pApplicationInfo(Vk.initAppInfo(stack, window.title.get(), "0.0.1", ENGINE_NAME, ENGINE_VERSION))
+			    .pApplicationInfo(Vk.initAppInfo(stack, window.title.get(), "0.0.2", ENGINE_NAME, ENGINE_VERSION))
 			    .ppEnabledLayerNames(Vk.stringsToPP(layerNames, stack))
 			    .ppEnabledExtensionNames(Vk.stringsToPP(extensionNames, stack));
 			
 			instance=Vk.createInstance(info, allocator);
 		}
+		initDebugLog();
+		
+		window.createSurface(this);
+		intGpus();
+		
+	}
+	
+	private void validateList(List<String> supported, List<String> requested, String type){
+		List<String> fails=requested.stream()
+		                            .filter(l->!supported.contains(l))
+		                            .map(s->s==null?"<NULL_STRING>":s.isEmpty()?"<EMPTY_STRING>":s)
+		                            .collect(Collectors.toList());
+		
+		if(!fails.isEmpty()){
+			throw new IllegalStateException(TextUtil.plural(type, fails.size())+" not supported: "+fails.stream().collect(Collectors.joining(", ")));
+		}
+	}
+	
+	private void initAddons(MemoryStack stack, List<String> layerNames, List<String> extensionNames){
+		
+		if(DEVELOPMENT){
+			ValidationLayers.addLayers(layerNames);
+			
+			extensionNames.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+			
+		}
+		
+		PointerBuffer requ=glfwGetRequiredInstanceExtensions();
+		Stream.generate(requ::getStringUTF8).limit(requ.limit()).forEach(extensionNames::add);
+		
+		validateList(Vk.enumerateInstanceLayerProperties(stack).stream().map(VkLayerProperties::layerNameString).collect(Collectors.toList()), layerNames, "Layer");
+		validateList(Vk.enumerateInstanceExtensionProperties(stack).stream().map(VkExtensionProperties::extensionNameString).collect(Collectors.toList()), extensionNames, "Extension");
+		
+	}
+	
+	private long getGpuVRam(VkGpu g){
+		return g.getMemoryProperties()
+		        .memoryHeaps()
+		        .stream()
+		        .filter(heap->(heap.flags()&VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)==1)
+		        .mapToLong(VkMemoryHeap::size)
+		        .max()
+		        .orElse(0);
+	}
+	
+	private void intGpus(){
+		try(MemoryStack stack=stackPush()){
+			List<VkGpu> gpus=Arrays.stream(Vk.getPhysicalDevices(stack, instance)).map(d->new VkGpu(this, d)).collect(Collectors.toList());
+			if(gpus.isEmpty()) throw new RuntimeException("No devices support Vulkan");
+			
+			List<String> renderExtensions =new ArrayList<>(List.of(VK_KHR_SWAPCHAIN_EXTENSION_NAME));
+			List<String> computeExtensions=new ArrayList<>(List.of());
+			
+			Comparator<VkGpu> sort=(g1, g2)->-Long.compare(getGpuVRam(g1), getGpuVRam(g2));
+			
+			renderGpu=gpus.stream()
+			              .filter(gpu->{
+				
+				              if(!gpu.getDeviceExtensionProperties().containsAll(renderExtensions)) return false;
+				
+				              if(gpu.getGraphicsQueue()==null||
+				                 gpu.getSurfaceQueue()==null||
+				                 gpu.getTransferQueue()==null) return false;
+				
+				              VkPhysicalDeviceFeatures features=gpu.getFeatures();
+				
+				              return features.geometryShader()&&
+				                     features.shaderClipDistance()&&
+				                     features.shaderTessellationAndGeometryPointSize()&&
+				                     features.tessellationShader();
+			              })
+			              .sorted(sort)
+			              .findFirst()
+			              .orElseThrow(()->new RuntimeException("No Vulkan compatible devices can display to a screen or do not meet minimal requirements"));
+			
+			computeGpu=gpus.stream()
+			               .filter(gpu->gpu.getDeviceExtensionProperties().containsAll(computeExtensions)&&gpu.getTransferQueue()!=null)
+			               .sorted(sort.thenComparing((g1, g2)->Boolean.compare(g1==renderGpu, g2==renderGpu)))
+			               .findFirst()
+			               .orElseThrow(()->new RuntimeException("No Vulkan compatible devices can display to a screen or do not meet minimal requirements"));
+			
+			gpus.remove(renderGpu);
+			gpus.remove(computeGpu);
+			gpus.forEach(VkGpu::destroy);
+		}
+	}
+	
+	private void initDebugLog(){
+		if(!DEVELOPMENT) return;
+		
+		try(MemoryStack stack=stackPush()){
+			
+			debugReport=new VkDebugReport(this, stack, (type, prefix, code, message)->{
+				if(message.startsWith("Device Extension")) return;
+				
+				List<String>  msgLin=TextUtil.wrapLongString(message, 100);
+				StringBuilder msg   =new StringBuilder().append(type).append(": [").append(prefix).append("] Code ").append(code).append(": ");
+				
+				if(msgLin.size()>1) msg.append("\n").append(TextUtil.wrappedString(UtilL.array(msgLin)));
+				else msg.append(msgLin.get(0));
+				
+				if(type==VkDebugReport.Type.ERROR||type==VkDebugReport.Type.WARNING) throw new RuntimeException(msg.toString());
+				else LogUtil.println(msg);
+			});
+		}
+		
 	}
 	
 	public VkInstance getInstance(){
@@ -113,8 +203,17 @@ public class VulkanRenderer implements VkDestroyable{
 		return allocator;
 	}
 	
+	public GlfwWindowVk getWindow(){
+		return window;
+	}
+	
 	@Override
 	public void destroy(){
+		
+		if(DEVELOPMENT){
+			debugReport.destroy();
+		}
+		
 		vkDestroyInstance(instance, allocator);
 	}
 	
