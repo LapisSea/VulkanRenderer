@@ -79,11 +79,11 @@ public class VkDebugReport{
 	
 	public VkDebugReport(VulkanRenderer instance, LongBuffer lb, VkDebugReportCallbackCreateInfoEXT createInfo){
 		this.instance=instance;
-		callback=createDebugReportCallbackEXT(instance.getInstance(), createInfo, instance.getAllocator(), lb);
+		callback=createDebugReportCallbackEXT(instance.getInstance(), createInfo, null, lb);
 	}
 	
 	public void destroy(){
-		destroyDebugReportCallbackEXT(instance.getInstance(), callback, instance.getAllocator());
+		destroyDebugReportCallbackEXT(instance.getInstance(), callback, null);
 	}
 	
 	

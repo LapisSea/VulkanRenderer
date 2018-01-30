@@ -69,6 +69,14 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			                            .map(VkExtensionProperties::extensionNameString)
 			                            .collect(Collectors.toList());
 			
+		}
+		
+		initQus();
+		
+	}
+	
+	private void initQus(){
+		try(MemoryStack stack=stackPush()){
 			VkQueueFamilyProperties.Buffer props=getQueueFamilyProperties();
 			
 			IntBuffer ip=stack.callocInt(1);
@@ -79,7 +87,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 				if(graphicsQueue==null&&(flags&VK_QUEUE_GRAPHICS_BIT)!=0){
 					graphicsQueue=new Queue(i);
 				}
-				if(surfaceQueue==null&&Vk.getPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, instance.getWindow(), ip)){
+				if(surfaceQueue==null&&Vk.getPhysicalDeviceSurfaceSupportKHR(this, i, ip)){
 					surfaceQueue=new Queue(i);
 				}
 				if(transferQueue==null&&(flags&VK_QUEUE_TRANSFER_BIT)!=0&&(flags&VK_QUEUE_GRAPHICS_BIT)==0){
@@ -89,7 +97,6 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			
 			if(transferQueue==null) transferQueue=graphicsQueue;
 		}
-		
 	}
 	
 	public boolean init(PointerBuffer layers, PointerBuffer extensions){
@@ -127,7 +134,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			    .pEnabledFeatures(deviceFeatures)
 			    .ppEnabledExtensionNames(extensions)
 			    .ppEnabledLayerNames(layers);
-			logicalDevice=Vk.createDevice(physicalDevice, info, instance.getAllocator(), stack.mallocPointer(1));
+			logicalDevice=Vk.createDevice(physicalDevice, info, null, stack.mallocPointer(1));
 		}
 		
 		if(graphicsQueue!=null) graphicsQueue.init();
@@ -141,7 +148,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	public void destroy(){
 		
 		if(logicalDevice!=null){
-			vkDestroyDevice(logicalDevice, instance.getAllocator());
+			vkDestroyDevice(logicalDevice, null);
 			
 		}
 		memoryProperties.free();
@@ -218,4 +225,8 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		return deviceExtensionProperties;
 	}
 	
+	@Override
+	public VkDevice getDevice(){
+		return logicalDevice;
+	}
 }

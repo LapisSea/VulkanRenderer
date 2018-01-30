@@ -9,7 +9,6 @@ public interface VkGpuCtx{
 	VkGpu getGpu();
 	
 	default VkDevice getDevice(){
-		UtilL.uncheckedThrow(new RuntimeException());
 		return getGpu().getDevice();
 	}
 }

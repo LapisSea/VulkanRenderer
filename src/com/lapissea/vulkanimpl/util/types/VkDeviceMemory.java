@@ -25,7 +25,7 @@ public class VkDeviceMemory extends VkBufferedLong implements VkGpuCtx{
 		VkGpu      gpu=ctx.getGpu();
 		LongBuffer lb =memAllocLong(1);
 		
-		int code=vkAllocateMemory(gpu.getDevice(), info, gpu.getInstance().getAllocator(), lb);
+		int code=vkAllocateMemory(gpu.getDevice(), info, null, lb);
 		if(DEVELOPMENT) Vk.check(code);
 		
 		return new VkDeviceMemory(lb, gpu);
@@ -33,7 +33,7 @@ public class VkDeviceMemory extends VkBufferedLong implements VkGpuCtx{
 	
 	@Override
 	public void destroy(){
-		vkFreeMemory(gpu.getDevice(), buff.get(0), gpu.getInstance().getAllocator());
+		vkFreeMemory(gpu.getDevice(), buff.get(0), null);
 		super.destroy();
 	}
 	

@@ -10,7 +10,6 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
-import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import org.lwjgl.PointerBuffer;
@@ -24,7 +23,6 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import static com.lapissea.vulkanimpl.VulkanRenderer.*;
-import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.EXTDebugReport.*;
 import static org.lwjgl.vulkan.KHRDisplaySwapchain.*;
@@ -210,13 +208,12 @@ public class Vk{
 		return dest.get(0);
 	}
 	
-	public static boolean getPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, int queueFamilyIndex, GlfwWindowVk window, IntBuffer dest){
+	public static boolean getPhysicalDeviceSurfaceSupportKHR(VkGpu gpu, int queueFamilyIndex, IntBuffer dest){
 		if(DEVELOPMENT){
-			Objects.requireNonNull(physicalDevice);
-			Objects.requireNonNull(window);
-			if(window.getSurface()<=0) throw new NullPointerException();
+			Objects.requireNonNull(gpu.getPhysicalDevice());
+			if(gpu.getInstance().getSurface()==0) throw new NullPointerException();
 		}
-		int code=KHRSurface.vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, queueFamilyIndex, window.getSurface(), dest);
+		int code=KHRSurface.vkGetPhysicalDeviceSurfaceSupportKHR(gpu.getPhysicalDevice(), queueFamilyIndex, gpu.getInstance().getSurface(), dest);
 		if(DEVELOPMENT) check(code);
 		return dest.get(0)==VK_TRUE;
 	}
@@ -240,6 +237,24 @@ public class Vk{
 			dest.put(i++, memASCII(s));
 		}
 		return dest;
+	}
+	
+	public static void getPhysicalDeviceSurfaceCapabilitiesKHR(VkGpu gpu, long surface, VkSurfaceCapabilitiesKHR caps){
+		int code=vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu.getPhysicalDevice(), surface, caps);
+		if(DEVELOPMENT) check(code);
+	}
+	
+	public static VkSurfaceFormatKHR.Buffer getPhysicalDeviceSurfaceFormatsKHR(VkGpu gpu, long surface, MemoryStack stack){
+		IntBuffer count=stack.mallocInt(1);
+		getPhysicalDeviceSurfaceFormatsKHR(gpu, surface, count, null);
+		VkSurfaceFormatKHR.Buffer surfaceFormats=VkSurfaceFormatKHR.mallocStack(count.get(0));
+		getPhysicalDeviceSurfaceFormatsKHR(gpu, surface, count, surfaceFormats);
+		return surfaceFormats;
+	}
+	
+	public static void getPhysicalDeviceSurfaceFormatsKHR(VkGpu gpu, long surface, IntBuffer count, VkSurfaceFormatKHR.Buffer surfaceFormats){
+		int code=vkGetPhysicalDeviceSurfaceFormatsKHR(gpu.getPhysicalDevice(), surface, count, surfaceFormats);
+		if(DEVELOPMENT) check(code);
 	}
 	
 	/*/START_GEN/*/

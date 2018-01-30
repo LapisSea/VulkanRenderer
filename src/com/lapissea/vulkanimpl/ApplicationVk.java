@@ -2,11 +2,12 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.datamanager.DataManager;
 import com.lapissea.datamanager.IDataManager;
-import com.lapissea.glfwwin.GlfwMonitor;
-import com.lapissea.glfwwin.GlfwWindow;
-import com.lapissea.util.LogUtil;
+import com.lapissea.glfw.GlfwMonitor;
+import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import org.lwjgl.glfw.GLFWImage;
 
 import javax.imageio.ImageIO;
@@ -16,7 +17,6 @@ import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.util.Objects;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 public class ApplicationVk{
 	
@@ -30,9 +30,6 @@ public class ApplicationVk{
 	private IDataManager textures;
 	
 	public ApplicationVk(){
-		
-		Stream.of(true, false, true, false).sorted(Boolean::compare).forEach(LogUtil::println);
-		
 		init();
 		while(run()) ;
 		destroy();
@@ -53,9 +50,10 @@ public class ApplicationVk{
 		Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "shutdown-thread"));
 		gameWindow.loadState(winSaveFile);
 		gameWindow.title.set("Vulkan attempt 2");
-//		gameWindow.monitor.set(GlfwMonitor.getMonitors().get(1));
-		gameWindow.init()
-		          .show();
+		gameWindow.init();
+		
+		TIntList pows=new TIntArrayList(5);
+		IntStream.range(3, 8).map(i->1<<i).forEach(pows::add);
 		
 		gameWindow.setIcon(
 			textures.getDirNamesS("icon")
@@ -65,7 +63,7 @@ public class ApplicationVk{
 					        String name=fileName.substring(fileName.lastIndexOf(File.separatorChar)+1, fileName.lastIndexOf('.'));
 					        int    res =Integer.parseInt(name);
 					
-					        if(IntStream.range(3, 8).map(i->1<<i).anyMatch(i->i==res)){
+					        if(pows.contains(res)){
 						        try(InputStream i=textures.getInStream("icon/"+fileName)){
 							        BufferedImage bi=ImageIO.read(i);
 							        if(bi.getWidth()!=res||bi.getHeight()!=res) return null;
@@ -81,6 +79,7 @@ public class ApplicationVk{
 		
 		
 		vkRenderer.createContext(gameWindow);
+		gameWindow.show();
 	}
 	
 	public boolean run(){
@@ -96,12 +95,13 @@ public class ApplicationVk{
 	
 	public void destroy(){
 		gameWindow.hide();
+		gameWindow.saveState(winSaveFile);
 		vkRenderer.destroy();
 		gameWindow.destroy();
 	}
 	
 	private void shutdown(){
-		gameWindow.saveState(winSaveFile);
+	
 	}
 	
 }

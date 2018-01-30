@@ -11,6 +11,7 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
+import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -21,6 +22,7 @@ import java.util.stream.Stream;
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.EXTDebugReport.*;
+import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -30,8 +32,7 @@ public class VulkanRenderer implements VkDestroyable{
 	public static final String ENGINE_NAME   ="JLapisor";
 	public static final String ENGINE_VERSION="0.0.1";
 	
-	private VkAllocationCallbacks allocator;
-	private VkDebugReport         debugReport;
+	private VkDebugReport debugReport;
 	
 	static{
 		String key="VulkanRenderer.devMode",
@@ -53,6 +54,13 @@ public class VulkanRenderer implements VkDestroyable{
 	private VkGpu renderGpu, computeGpu;
 	
 	private GlfwWindowVk window;
+	
+	
+	private long surface;
+	
+	public long getSurface(){
+		return surface;
+	}
 	
 	public VulkanRenderer(){
 	}
@@ -77,11 +85,11 @@ public class VulkanRenderer implements VkDestroyable{
 			    .ppEnabledLayerNames(Vk.stringsToPP(layerNames, stack))
 			    .ppEnabledExtensionNames(Vk.stringsToPP(extensionNames, stack));
 			
-			instance=Vk.createInstance(info, allocator);
+			instance=Vk.createInstance(info, null);
 		}
 		initDebugLog();
 		
-		window.createSurface(this);
+		surface=window.createSurface(instance);
 		intGpus();
 		
 	}
@@ -163,6 +171,19 @@ public class VulkanRenderer implements VkDestroyable{
 			gpus.remove(renderGpu);
 			gpus.remove(computeGpu);
 			gpus.forEach(VkGpu::destroy);
+			
+			if(renderGpu==computeGpu){
+				renderGpu.init(null, Vk.stringsToPP(Stream.concat(renderExtensions.stream(), computeExtensions.stream()).distinct().collect(Collectors.toList()), stack));
+			}else{
+				renderGpu.init(null, Vk.stringsToPP(renderExtensions, stack));
+				computeGpu.init(null, Vk.stringsToPP(computeExtensions, stack));
+			}
+			
+			VkSurfaceCapabilitiesKHR caps=VkSurfaceCapabilitiesKHR.callocStack(stack);
+			Vk.getPhysicalDeviceSurfaceCapabilitiesKHR(renderGpu, surface, caps);
+			
+			VkSurfaceFormatKHR.Buffer surfaceFormats=Vk.getPhysicalDeviceSurfaceFormatsKHR(renderGpu, surface, stack);
+			
 		}
 	}
 	
@@ -199,10 +220,6 @@ public class VulkanRenderer implements VkDestroyable{
 		return computeGpu;
 	}
 	
-	public VkAllocationCallbacks getAllocator(){
-		return allocator;
-	}
-	
 	public GlfwWindowVk getWindow(){
 		return window;
 	}
@@ -214,7 +231,9 @@ public class VulkanRenderer implements VkDestroyable{
 			debugReport.destroy();
 		}
 		
-		vkDestroyInstance(instance, allocator);
+		vkDestroySurfaceKHR(instance, surface, null);
+		
+		vkDestroyInstance(instance, null);
 	}
 	
 }
