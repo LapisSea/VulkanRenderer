@@ -1,6 +1,8 @@
 package com.lapissea.vulkanimpl;
 
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.TextUtil;
+import org.lwjgl.vulkan.VkExtent2D;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -20,6 +22,8 @@ public class LaunchVk{
 		}
 		
 		sysProps(parsedArgs);
+		
+		TextUtil.__REGISTER_CUSTOM_TO_STRING(VkExtent2D.class, extent2D->extent2D.getClass().getSimpleName()+"{width="+extent2D.width()+", height="+extent2D.height()+"}");
 		
 		new ApplicationVk();
 	}

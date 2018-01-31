@@ -8,7 +8,7 @@ import org.lwjgl.vulkan.VkMemoryAllocateInfo;
 
 import java.nio.LongBuffer;
 
-import static com.lapissea.vulkanimpl.VulkanRenderer.*;
+import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 

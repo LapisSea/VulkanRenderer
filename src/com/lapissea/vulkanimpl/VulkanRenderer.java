@@ -3,15 +3,16 @@ package com.lapissea.vulkanimpl;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.event.change.ChangeRegistryBool;
 import com.lapissea.vulkanimpl.devonly.ValidationLayers;
 import com.lapissea.vulkanimpl.devonly.VkDebugReport;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
+import com.lapissea.vulkanimpl.util.types.VkSurface;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
-import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.EXTDebugReport.*;
@@ -28,39 +30,46 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public class VulkanRenderer implements VkDestroyable{
 	
-	public static final boolean DEVELOPMENT;
+	
+	public static class Settings{
+		
+		public static final boolean DEVELOPMENT;
+		
+		static{
+			String key="VulkanRenderer.devMode",
+				devArg0=System.getProperty(key, "false"),
+				devArg=devArg0.toLowerCase();
+			
+			if(devArg.equals("true")) DEVELOPMENT=true;
+			else{
+				if(devArg.equals("false")) DEVELOPMENT=false;
+				else throw UtilL.exitWithErrorMsg("Invalid property: "+key+"="+devArg0+" (valid: \"true\", \"false\", \"\")");
+			}
+			System.setProperty("org.lwjgl.util.NoChecks", Boolean.toString(DEVELOPMENT));
+			LogUtil.println("Running VulkanRenderer in "+(DEVELOPMENT?"development":"production")+" mode");
+		}
+		
+		public ChangeRegistryBool enableVsync           =new ChangeRegistryBool(true);
+		public ChangeRegistryBool enableTrippleBuffering=new ChangeRegistryBool(true);
+	}
+	
 	public static final String ENGINE_NAME   ="JLapisor";
 	public static final String ENGINE_VERSION="0.0.1";
 	
 	private VkDebugReport debugReport;
 	
-	static{
-		String key="VulkanRenderer.devMode",
-			devArg0=System.getProperty(key, "false"),
-			devArg=devArg0.toLowerCase();
-		
-		if(devArg.equals("true")) DEVELOPMENT=true;
-		else{
-			if(devArg.equals("false")) DEVELOPMENT=false;
-			else throw UtilL.exitWithErrorMsg("Invalid property: "+key+"="+devArg0+" (valid: \"true\", \"false\", \"\")");
-		}
-		System.setProperty("org.lwjgl.util.NoChecks", Boolean.toString(DEVELOPMENT));
-		LogUtil.println("Running VulkanRenderer in "+(DEVELOPMENT?"development":"production")+" mode");
-	}
-	
-	
 	private VkInstance instance;
 	
 	private VkGpu renderGpu, computeGpu;
 	
+	private VkSwapchain  swapchain;
 	private GlfwWindowVk window;
 	
 	
-	private long surface;
+	private VkSurface surface;
 	
-	public long getSurface(){
-		return surface;
-	}
+	private Settings settings=new Settings();
+	
 	
 	public VulkanRenderer(){
 	}
@@ -91,6 +100,8 @@ public class VulkanRenderer implements VkDestroyable{
 		
 		surface=window.createSurface(instance);
 		intGpus();
+		swapchain=new VkSwapchain(renderGpu, surface);
+		
 		
 	}
 	
@@ -178,12 +189,6 @@ public class VulkanRenderer implements VkDestroyable{
 				renderGpu.init(null, Vk.stringsToPP(renderExtensions, stack));
 				computeGpu.init(null, Vk.stringsToPP(computeExtensions, stack));
 			}
-			
-			VkSurfaceCapabilitiesKHR caps=VkSurfaceCapabilitiesKHR.callocStack(stack);
-			Vk.getPhysicalDeviceSurfaceCapabilitiesKHR(renderGpu, surface, caps);
-			
-			VkSurfaceFormatKHR.Buffer surfaceFormats=Vk.getPhysicalDeviceSurfaceFormatsKHR(renderGpu, surface, stack);
-			
 		}
 	}
 	
@@ -202,7 +207,7 @@ public class VulkanRenderer implements VkDestroyable{
 				else msg.append(msgLin.get(0));
 				
 				if(type==VkDebugReport.Type.ERROR||type==VkDebugReport.Type.WARNING) throw new RuntimeException(msg.toString());
-				else LogUtil.println(msg);
+//				else LogUtil.println(msg);
 			});
 		}
 		
@@ -224,6 +229,14 @@ public class VulkanRenderer implements VkDestroyable{
 		return window;
 	}
 	
+	public Settings getSettings(){
+		return settings;
+	}
+	
+	public VkSurface getSurface(){
+		return surface;
+	}
+	
 	@Override
 	public void destroy(){
 		
@@ -231,7 +244,7 @@ public class VulkanRenderer implements VkDestroyable{
 			debugReport.destroy();
 		}
 		
-		vkDestroySurfaceKHR(instance, surface, null);
+		vkDestroySurfaceKHR(instance, surface.handle, null);
 		
 		vkDestroyInstance(instance, null);
 	}

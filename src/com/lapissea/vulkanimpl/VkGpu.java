@@ -13,7 +13,7 @@ import java.nio.IntBuffer;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.lapissea.vulkanimpl.VulkanRenderer.*;
+import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -71,11 +71,11 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			
 		}
 		
-		initQus();
+		findQueueFamilies();
 		
 	}
 	
-	private void initQus(){
+	private void findQueueFamilies(){
 		try(MemoryStack stack=stackPush()){
 			VkQueueFamilyProperties.Buffer props=getQueueFamilyProperties();
 			

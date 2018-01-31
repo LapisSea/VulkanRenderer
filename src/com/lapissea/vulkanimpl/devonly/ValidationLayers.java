@@ -1,15 +1,8 @@
 package com.lapissea.vulkanimpl.devonly;
 
-import com.lapissea.vulkanimpl.Vk;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.vulkan.VkLayerProperties;
-
 import java.util.Collection;
-import java.util.List;
-import java.util.stream.Collectors;
 
-import static com.lapissea.vulkanimpl.VulkanRenderer.*;
-import static org.lwjgl.system.MemoryStack.*;
+import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 
 public class ValidationLayers{
 	

@@ -94,8 +94,8 @@ public class ApplicationVk{
 	
 	
 	public void destroy(){
-		gameWindow.hide();
 		gameWindow.saveState(winSaveFile);
+		gameWindow.hide();
 		vkRenderer.destroy();
 		gameWindow.destroy();
 	}

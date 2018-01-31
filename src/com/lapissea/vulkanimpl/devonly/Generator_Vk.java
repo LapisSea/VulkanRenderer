@@ -14,6 +14,7 @@ import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 import static com.lapissea.vulkanimpl.VulkanRenderer.*;
+import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 
 public class Generator_Vk{
 	
