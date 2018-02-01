@@ -10,6 +10,7 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.vulkanimpl.util.types.VkImage;
 import com.lapissea.vulkanimpl.util.types.VkSurface;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
@@ -269,6 +270,38 @@ public class Vk{
 	
 	public static long createSwapchainKHR(VkDevice device, VkSwapchainCreateInfoKHR info, LongBuffer dest){
 		int code=vkCreateSwapchainKHR(device, info, null, dest);
+		if(DEVELOPMENT) check(code);
+		return dest.get(0);
+	}
+	
+	public static int getSwapchainImagesKHR(VkGpu gpu, VkSwapchain vkSwapchain, IntBuffer imageCount, LongBuffer images){
+		int code=vkGetSwapchainImagesKHR(gpu.getDevice(), vkSwapchain.getHandle(), imageCount, images);
+		if(DEVELOPMENT) check(code);
+		return imageCount.get(0);
+	}
+	
+	public static VkImage[] getSwapchainImagesKHR(VkGpu gpu, VkSwapchain vkSwapchain, MemoryStack stack){
+		IntBuffer ib   =stack.mallocInt(1);
+		int       count=getSwapchainImagesKHR(gpu, vkSwapchain, ib, null);
+		
+		LongBuffer lb=stack.mallocLong(count);
+		getSwapchainImagesKHR(gpu, vkSwapchain, ib, lb);
+		
+		VkImage[] images=new VkImage[count];
+		for(int i=0;i<lb.limit();i++){
+			images[i]=new VkImage(memAllocLong(1).put(0, lb.get(i)), gpu){
+				@Override
+				public void destroy(){
+					memFree(getBuff());
+				}
+			};
+		}
+		
+		return images;
+	}
+	
+	public static long createImageView(VkGpu gpu, VkImageViewCreateInfo info, LongBuffer dest){
+		int code=vkCreateImageView(gpu.getDevice(), info, null, dest);
 		if(DEVELOPMENT) check(code);
 		return dest.get(0);
 	}

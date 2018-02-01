@@ -1,0 +1,19 @@
+package com.lapissea.vulkanimpl.shaders.states;
+
+import static org.lwjgl.vulkan.VK10.*;
+
+public enum VkDrawMode{
+	POINTS(VK_PRIMITIVE_TOPOLOGY_POINT_LIST, VK_POLYGON_MODE_POINT),
+	LINES(VK_PRIMITIVE_TOPOLOGY_LINE_LIST, VK_POLYGON_MODE_LINE),
+	LINE_STRIP(VK_PRIMITIVE_TOPOLOGY_LINE_STRIP, VK_POLYGON_MODE_LINE),
+	TRIANGLES(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL),
+	TRIANGLE_STRIP(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, VK_POLYGON_MODE_FILL),
+	TRIANGLE_FAN(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN, VK_POLYGON_MODE_FILL);
+	
+	public final int handle, polygonMode;
+	
+	VkDrawMode(int handle, int polygonMode){
+		this.polygonMode=polygonMode;
+		this.handle=handle;
+	}
+}

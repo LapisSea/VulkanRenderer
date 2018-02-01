@@ -1,18 +1,24 @@
 package com.lapissea.vulkanimpl;
 
+import com.lapissea.datamanager.IDataManager;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.event.change.ChangeRegistryBool;
+import com.lapissea.util.filechange.FileChageDetector;
+import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.devonly.ValidationLayers;
 import com.lapissea.vulkanimpl.devonly.VkDebugReport;
+import com.lapissea.vulkanimpl.shaders.VkShader;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
+import com.lapissea.vulkanimpl.util.VkShaderCompiler;
 import com.lapissea.vulkanimpl.util.types.VkSurface;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -24,12 +30,10 @@ import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.EXTDebugReport.*;
-import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VulkanRenderer implements VkDestroyable{
-	
 	
 	public static class Settings{
 		
@@ -65,21 +69,21 @@ public class VulkanRenderer implements VkDestroyable{
 	private VkSwapchain  swapchain;
 	private GlfwWindowVk window;
 	
-	
 	private VkSurface surface;
 	
+	private VkShader shader;
+	
+	
 	private Settings settings=new Settings();
+	public IDataManager assets;
 	
-	
-	public VulkanRenderer(){
-	}
-	
-	public void render(){
-	
+	public VulkanRenderer(IDataManager assets){
+		this.assets=assets;
 	}
 	
 	public void createContext(GlfwWindowVk window){
 		this.window=window;
+		window.size.register(e->onWindowResize(e.getSource()));
 		
 		try(MemoryStack stack=stackPush()){
 			
@@ -98,11 +102,11 @@ public class VulkanRenderer implements VkDestroyable{
 		}
 		initDebugLog();
 		
-		surface=window.createSurface(instance);
+		surface=window.createSurface(this);
 		intGpus();
 		swapchain=new VkSwapchain(renderGpu, surface);
 		
-		
+		initGraphicsPipeline();
 	}
 	
 	private void validateList(List<String> supported, List<String> requested, String type){
@@ -163,7 +167,6 @@ public class VulkanRenderer implements VkDestroyable{
 				                 gpu.getTransferQueue()==null) return false;
 				
 				              VkPhysicalDeviceFeatures features=gpu.getFeatures();
-				
 				              return features.geometryShader()&&
 				                     features.shaderClipDistance()&&
 				                     features.shaderTessellationAndGeometryPointSize()&&
@@ -213,6 +216,24 @@ public class VulkanRenderer implements VkDestroyable{
 		
 	}
 	
+	private void initGraphicsPipeline(){
+		if(DEVELOPMENT){
+			FileChageDetector.autoHandle(new File("res/assets/shaders/test.vert"), ()->VkShaderCompiler.compileVertex("test.vert"));
+			FileChageDetector.autoHandle(new File("res/assets/shaders/test.frag"), ()->VkShaderCompiler.compileFragment("test.frag"));
+		}
+		
+		shader=new VkShader(assets.subData("assets/shaders"), "test", getRenderGpu(), surface);
+		shader.init();
+	}
+	
+	private void onWindowResize(IVec2iR size){
+		LogUtil.println(size);
+	}
+	
+	public void render(){
+	
+	}
+	
 	public VkInstance getInstance(){
 		return instance;
 	}
@@ -240,12 +261,14 @@ public class VulkanRenderer implements VkDestroyable{
 	@Override
 	public void destroy(){
 		
+		shader.destroy();
+		
+		swapchain.destroy();
+		surface.destroy();
+		
 		if(DEVELOPMENT){
 			debugReport.destroy();
 		}
-		
-		vkDestroySurfaceKHR(instance, surface.handle, null);
-		
 		vkDestroyInstance(instance, null);
 	}
 	

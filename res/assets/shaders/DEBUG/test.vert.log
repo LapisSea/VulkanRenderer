@@ -1,6 +1,0 @@
-ERROR: C:\Users\LapisSea PC\Programming\Java\FastFolderUtil\VulkanNutCracker\res\shaders\test.vert:18: 'model' : undeclared identifier 
-ERROR: C:\Users\LapisSea PC\Programming\Java\FastFolderUtil\VulkanNutCracker\res\shaders\test.vert:18: '' : compilation terminated 
-ERROR: 2 compilation errors.  No code generated.
-
-
-SPIR-V is not generated for failed compile or link

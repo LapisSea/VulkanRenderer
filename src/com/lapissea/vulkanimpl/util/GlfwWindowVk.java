@@ -1,8 +1,8 @@
 package com.lapissea.vulkanimpl.util;
 
 import com.lapissea.glfw.GlfwWindow;
+import com.lapissea.vulkanimpl.VulkanRenderer;
 import com.lapissea.vulkanimpl.util.types.VkSurface;
-import org.lwjgl.vulkan.VkInstance;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
@@ -20,9 +20,9 @@ public class GlfwWindowVk extends GlfwWindow{
 		return super.init();
 	}
 	
-	public VkSurface createSurface(VkInstance instance){
+	public VkSurface createSurface(VulkanRenderer renderer){
 		long[] result={0};
-		int    code  =glfwCreateWindowSurface(instance, handle, null, result);
-		return new VkSurface(result[0]);
+		int    code  =glfwCreateWindowSurface(renderer.getInstance(), handle, null, result);
+		return new VkSurface(result[0], renderer);
 	}
 }

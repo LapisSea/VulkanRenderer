@@ -1,7 +1,6 @@
 package com.lapissea.vulkanimpl;
 
 import com.lapissea.datamanager.DataManager;
-import com.lapissea.datamanager.IDataManager;
 import com.lapissea.glfw.GlfwMonitor;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
@@ -22,12 +21,11 @@ public class ApplicationVk{
 	
 	private static final boolean TO_JAR=true;
 	
-	private final VulkanRenderer vkRenderer =new VulkanRenderer();
-	private final GlfwWindowVk   gameWindow =new GlfwWindowVk();
-	private final File           winSaveFile=new File("WindowState.json");
+	private VulkanRenderer vkRenderer;
+	private GlfwWindowVk gameWindow =new GlfwWindowVk();
+	private File         winSaveFile=new File("WindowState.json");
 	
-	private DataManager  manger;
-	private IDataManager textures;
+	private DataManager manger;
 	
 	public ApplicationVk(){
 		init();
@@ -43,11 +41,19 @@ public class ApplicationVk{
 			manger.registerDomain(root);
 		}catch(URISyntaxException e){}
 		
-		textures=manger.subData("assets/textures");
+		vkRenderer=new VulkanRenderer(manger);
 		
 		GlfwMonitor.init();
 		
 		Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "shutdown-thread"));
+		
+		setUpWindow();
+		
+		vkRenderer.createContext(gameWindow);
+		gameWindow.show();
+	}
+	
+	private void setUpWindow(){
 		gameWindow.loadState(winSaveFile);
 		gameWindow.title.set("Vulkan attempt 2");
 		gameWindow.init();
@@ -55,31 +61,29 @@ public class ApplicationVk{
 		TIntList pows=new TIntArrayList(5);
 		IntStream.range(3, 8).map(i->1<<i).forEach(pows::add);
 		
+		String iconsPath="assets/textures/icon/";
 		gameWindow.setIcon(
-			textures.getDirNamesS("icon")
-			        .parallel()
-			        .map(fileName->{
-				        try{
-					        String name=fileName.substring(fileName.lastIndexOf(File.separatorChar)+1, fileName.lastIndexOf('.'));
-					        int    res =Integer.parseInt(name);
+			manger.getDirNamesS(iconsPath)
+			      .parallel()
+			      .map(fileName->{
+				      try{
+					      String name=fileName.substring(fileName.lastIndexOf(File.separatorChar)+1, fileName.lastIndexOf('.'));
+					      int    res =Integer.parseInt(name);
 					
-					        if(pows.contains(res)){
-						        try(InputStream i=textures.getInStream("icon/"+fileName)){
-							        BufferedImage bi=ImageIO.read(i);
-							        if(bi.getWidth()!=res||bi.getHeight()!=res) return null;
-							        return bi;
-						        }
-					        }
-				        }catch(Exception e){}
-				        return null;
-			        })
-			        .filter(Objects::nonNull)
-			        .map(GlfwWindow::imgToGlfw)
-			        .toArray(GLFWImage[]::new));
+					      if(pows.contains(res)){
+						      try(InputStream i=manger.getInStream(iconsPath+fileName)){
+							      BufferedImage bi=ImageIO.read(i);
+							      if(bi.getWidth()!=res||bi.getHeight()!=res) return null;
+							      return bi;
+						      }
+					      }
+				      }catch(Exception e){}
+				      return null;
+			      })
+			      .filter(Objects::nonNull)
+			      .map(GlfwWindow::imgToGlfw)
+			      .toArray(GLFWImage[]::new));
 		
-		
-		vkRenderer.createContext(gameWindow);
-		gameWindow.show();
 	}
 	
 	public boolean run(){
