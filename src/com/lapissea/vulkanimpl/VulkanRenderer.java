@@ -9,6 +9,7 @@ import com.lapissea.util.filechange.FileChageDetector;
 import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.devonly.ValidationLayers;
 import com.lapissea.vulkanimpl.devonly.VkDebugReport;
+import com.lapissea.vulkanimpl.shaders.ShaderState;
 import com.lapissea.vulkanimpl.shaders.VkShader;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
@@ -19,10 +20,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -72,10 +70,12 @@ public class VulkanRenderer implements VkDestroyable{
 	private VkSurface surface;
 	
 	private VkShader shader;
-	
+	private long     renderPass;
 	
 	private Settings settings=new Settings();
 	public IDataManager assets;
+	
+	private long commandPool;
 	
 	public VulkanRenderer(IDataManager assets){
 		this.assets=assets;
@@ -106,7 +106,44 @@ public class VulkanRenderer implements VkDestroyable{
 		intGpus();
 		swapchain=new VkSwapchain(renderGpu, surface);
 		
+		
+		initRenderPass();
 		initGraphicsPipeline();
+	}
+	
+	private void initRenderPass(){
+		
+		try(MemoryStack stack=stackPush()){
+			
+			VkAttachmentDescription.Buffer attachments=VkAttachmentDescription.callocStack(1, stack);
+			attachments.get(0)//color attachment
+			           .format(swapchain.getFormat()).samples(VK_SAMPLE_COUNT_1_BIT)
+			           .loadOp(VK_ATTACHMENT_LOAD_OP_CLEAR)
+			           .storeOp(VK_ATTACHMENT_STORE_OP_STORE)
+			           .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+			           .stencilStoreOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
+			           .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
+			           .finalLayout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+			
+			VkAttachmentReference.Buffer colorAttachmentRef=VkAttachmentReference.callocStack(1, stack);
+			colorAttachmentRef.get(0) //fragment out color
+			                  .attachment(0)
+			                  .layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			
+			VkSubpassDescription.Buffer subpasses=VkSubpassDescription.callocStack(1, stack);
+			subpasses.get(0)
+			         .pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
+			         .colorAttachmentCount(colorAttachmentRef.limit())
+			         .pColorAttachments(colorAttachmentRef);
+			
+			VkRenderPassCreateInfo renderPassInfo=VkRenderPassCreateInfo.callocStack(stack);
+			renderPassInfo.sType(VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO)
+			              .pAttachments(attachments)
+			              .pSubpasses(subpasses);
+			renderPass=Vk.createRenderPass(renderGpu, renderPassInfo, stack.mallocLong(1));
+			
+		}
+		
 	}
 	
 	private void validateList(List<String> supported, List<String> requested, String type){
@@ -166,7 +203,7 @@ public class VulkanRenderer implements VkDestroyable{
 				                 gpu.getSurfaceQueue()==null||
 				                 gpu.getTransferQueue()==null) return false;
 				
-				              VkPhysicalDeviceFeatures features=gpu.getFeatures();
+				              VkPhysicalDeviceFeatures features=gpu.getPhysicalFeatures();
 				              return features.geometryShader()&&
 				                     features.shaderClipDistance()&&
 				                     features.shaderTessellationAndGeometryPointSize()&&
@@ -223,7 +260,9 @@ public class VulkanRenderer implements VkDestroyable{
 		}
 		
 		shader=new VkShader(assets.subData("assets/shaders"), "test", getRenderGpu(), surface);
-		shader.init();
+		ShaderState state=new ShaderState();
+		state.setViewport(window.size);
+		shader.init(state, renderPass);
 	}
 	
 	private void onWindowResize(IVec2iR size){
@@ -261,6 +300,7 @@ public class VulkanRenderer implements VkDestroyable{
 	@Override
 	public void destroy(){
 		
+		vkDestroyRenderPass(renderGpu.getDevice(), renderPass, null);
 		shader.destroy();
 		
 		swapchain.destroy();

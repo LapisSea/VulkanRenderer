@@ -10,6 +10,7 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import com.lapissea.vulkanimpl.util.types.VkImage;
 import com.lapissea.vulkanimpl.util.types.VkSurface;
 import gnu.trove.map.TIntObjectMap;
@@ -18,6 +19,10 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.Collection;
@@ -258,8 +263,8 @@ public class Vk{
 		return surfaceFormats;
 	}
 	
-	public static void getPhysicalDeviceSurfaceFormatsKHR(VkGpu gpu, long surface, IntBuffer count, VkSurfaceFormatKHR.Buffer surfaceFormats){
-		int code=vkGetPhysicalDeviceSurfaceFormatsKHR(gpu.getPhysicalDevice(), surface, count, surfaceFormats);
+	public static void getPhysicalDeviceSurfaceFormatsKHR(VkGpuCtx gpu, long surface, IntBuffer count, VkSurfaceFormatKHR.Buffer surfaceFormats){
+		int code=vkGetPhysicalDeviceSurfaceFormatsKHR(gpu.getGpu().getPhysicalDevice(), surface, count, surfaceFormats);
 		if(DEVELOPMENT) check(code);
 	}
 	
@@ -268,13 +273,13 @@ public class Vk{
 		if(DEVELOPMENT) check(code);
 	}
 	
-	public static long createSwapchainKHR(VkDevice device, VkSwapchainCreateInfoKHR info, LongBuffer dest){
-		int code=vkCreateSwapchainKHR(device, info, null, dest);
+	public static long createSwapchainKHR(VkGpuCtx gpu, VkSwapchainCreateInfoKHR info, LongBuffer dest){
+		int code=vkCreateSwapchainKHR(gpu.getDevice(), info, null, dest);
 		if(DEVELOPMENT) check(code);
 		return dest.get(0);
 	}
 	
-	public static int getSwapchainImagesKHR(VkGpu gpu, VkSwapchain vkSwapchain, IntBuffer imageCount, LongBuffer images){
+	public static int getSwapchainImagesKHR(VkGpuCtx gpu, VkSwapchain vkSwapchain, IntBuffer imageCount, LongBuffer images){
 		int code=vkGetSwapchainImagesKHR(gpu.getDevice(), vkSwapchain.getHandle(), imageCount, images);
 		if(DEVELOPMENT) check(code);
 		return imageCount.get(0);
@@ -300,8 +305,61 @@ public class Vk{
 		return images;
 	}
 	
-	public static long createImageView(VkGpu gpu, VkImageViewCreateInfo info, LongBuffer dest){
+	public static long createImageView(VkGpuCtx gpu, VkImageViewCreateInfo info, LongBuffer dest){
 		int code=vkCreateImageView(gpu.getDevice(), info, null, dest);
+		if(DEVELOPMENT) check(code);
+		return dest.get(0);
+	}
+	
+	public static long createPipelineLayout(VkGpuCtx gpu, VkPipelineLayoutCreateInfo info, LongBuffer dest){
+		int code=vkCreatePipelineLayout(gpu.getDevice(), info, null, dest);
+		if(DEVELOPMENT) check(code);
+		return dest.get(0);
+	}
+	
+	public static long createRenderPass(VkGpuCtx gpu, VkRenderPassCreateInfo info, LongBuffer dest){
+		int code=vkCreateRenderPass(gpu.getDevice(), info, null, dest);
+		if(DEVELOPMENT) check(code);
+		return dest.get(0);
+	}
+	
+	public static long createGraphicsPipelines(VkGpuCtx gpu, long cache, VkGraphicsPipelineCreateInfo.Buffer pipelineInfo, LongBuffer dest){
+		if(DEVELOPMENT&&pipelineInfo.limit()!=dest.limit()) throw new IllegalArgumentException();
+		
+		int code=vkCreateGraphicsPipelines(gpu.getDevice(), cache, pipelineInfo, null, dest);
+		if(DEVELOPMENT) check(code);
+		return dest.get(0);
+	}
+	
+	public static void getPipelineCacheData(VkGpuCtx gpu, long handle, PointerBuffer size, ByteBuffer data){
+		int code=vkGetPipelineCacheData(gpu.getDevice(), handle, size, data);
+		if(DEVELOPMENT) check(code);
+	}
+	
+	public static ByteBuffer writeBytes(ByteBuffer data, BufferedOutputStream out) throws IOException{
+		for(int i=data.position();i<data.limit();i++){
+			out.write(data.get(i));
+		}
+		return data;
+	}
+	
+	public static ByteBuffer readBytes(ByteBuffer data, BufferedInputStream in) throws IOException{
+		
+		while(data.hasRemaining()){
+			data.put((byte)in.read());
+		}
+		
+		return data;
+	}
+	
+	public static long createFrameBuffer(VkGpuCtx gpuCtx, VkFramebufferCreateInfo framebufferInfo, LongBuffer dest){
+		int code=VK10.vkCreateFramebuffer(gpuCtx.getDevice(), framebufferInfo, null, dest);
+		if(DEVELOPMENT) check(code);
+		return dest.get(0);
+	}
+	
+	public static long createCommandPool(VkGpuCtx gpuCtx, VkCommandPoolCreateInfo poolInfo, LongBuffer dest){
+		int code=vkCreateCommandPool(gpuCtx.getDevice(), poolInfo, null, dest);
 		if(DEVELOPMENT) check(code);
 		return dest.get(0);
 	}

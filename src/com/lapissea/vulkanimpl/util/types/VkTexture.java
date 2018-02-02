@@ -55,4 +55,8 @@ public class VkTexture implements VkDestroyable, VkGpuCtx{
 	public VkGpu getGpu(){
 		return image.getGpu();
 	}
+	
+	public VkImage getImage(){
+		return image;
+	}
 }

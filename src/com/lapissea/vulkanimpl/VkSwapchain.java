@@ -9,12 +9,11 @@ import com.lapissea.vulkanimpl.util.types.VkSurface;
 import com.lapissea.vulkanimpl.util.types.VkTexture;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
-import org.lwjgl.vulkan.VkExtent2D;
-import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
-import org.lwjgl.vulkan.VkSurfaceFormatKHR;
-import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
+import org.lwjgl.vulkan.*;
 
 import java.nio.IntBuffer;
+import java.nio.LongBuffer;
+import java.util.stream.Stream;
 
 import static com.lapissea.util.UtilL.*;
 import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
@@ -28,6 +27,9 @@ public class VkSwapchain implements VkDestroyable{
 	private final VkGpu gpu;
 	private long handle=VK_NULL_HANDLE;
 	private VkTexture[] colorFrames;
+	private int         format, colorSpace;
+	private VkSurface surface;
+	private long[]    framebuffers;
 	
 	public VkSwapchain(VkGpu gpu, VkSurface surface){
 		this.gpu=gpu;
@@ -57,6 +59,9 @@ public class VkSwapchain implements VkDestroyable{
 		if(caps.maxImageCount()>0) imageCount=Math.min(imageCount, caps.maxImageCount());
 		
 		
+		this.format=format.format();
+		colorSpace=format.colorSpace();
+		
 		VkSwapchainCreateInfoKHR createInfo=VkSwapchainCreateInfoKHR.callocStack(stack);
 		createInfo.sType(VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR)
 		          .surface(surface.handle)
@@ -82,13 +87,30 @@ public class VkSwapchain implements VkDestroyable{
 		          .clipped(true)
 		          .oldSwapchain(VK_NULL_HANDLE);
 		
-		handle=Vk.createSwapchainKHR(gpu.getDevice(), createInfo, stack.mallocLong(1));
+		handle=Vk.createSwapchainKHR(gpu, createInfo, stack.mallocLong(1));
 		
-		colorFrames=UtilL.convert(Vk.getSwapchainImagesKHR(gpu, this, stack),
-		                          VkTexture[]::new,
+		colorFrames=UtilL.convert(Vk.getSwapchainImagesKHR(gpu, this, stack), VkTexture[]::new,
 		                          image->new VkTexture(image).createView(format.format(), VkImageAspect.COLOR));
+	}
+	
+	
+	public void initFrameBuffers(long renderPass){
 		
-		
+		try(MemoryStack stack=stackPush()){
+			
+			VkFramebufferCreateInfo framebufferInfo=VkFramebufferCreateInfo.callocStack(stack);
+			framebufferInfo.sType(VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO)
+			               .renderPass(renderPass)
+			               .width(surface.getSize().x())
+			               .height(surface.getSize().y())
+			               .layers(1);
+			
+			LongBuffer lb=stack.mallocLong(1);
+			framebuffers=Stream.of(colorFrames)
+			                   .mapToLong(c->Vk.createFrameBuffer(gpu, framebufferInfo.pAttachments(c.getImage().getBuff()), lb))
+			                   .toArray();
+			
+		}
 	}
 	
 	private VkSurfaceFormatKHR chooseSwapSurfaceFormat(VkSurfaceFormatKHR.Buffer availableFormats){
@@ -126,6 +148,9 @@ public class VkSwapchain implements VkDestroyable{
 	@Override
 	public void destroy(){
 		if(DEVELOPMENT&&handle==-1) throw new IllegalStateException("Swapchain already destroyed");
+		for(long framebuffer : framebuffers){
+			vkDestroyFramebuffer(gpu.getDevice(), framebuffer, null);
+		}
 		forEach(colorFrames, VkTexture::destroy);
 		vkDestroySwapchainKHR(gpu.getDevice(), handle, null);
 		handle=-1;
@@ -133,5 +158,9 @@ public class VkSwapchain implements VkDestroyable{
 	
 	public long getHandle(){
 		return handle;
+	}
+	
+	public int getFormat(){
+		return format;
 	}
 }

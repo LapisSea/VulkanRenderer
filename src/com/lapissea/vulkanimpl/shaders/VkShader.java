@@ -1,30 +1,38 @@
 package com.lapissea.vulkanimpl.shaders;
 
 import com.lapissea.datamanager.IDataManager;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.NanoTimer;
 import com.lapissea.util.UtilL;
-import com.lapissea.vec.interf.IVec2iR;
+import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
-import com.lapissea.vulkanimpl.shaders.states.VkDrawMode;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
+import com.lapissea.vulkanimpl.util.types.VkPipelineCache;
 import com.lapissea.vulkanimpl.util.types.VkShaderModule;
 import com.lapissea.vulkanimpl.util.types.VkSurface;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.vulkan.*;
+import org.lwjgl.vulkan.VkGraphicsPipelineCreateInfo;
+import org.lwjgl.vulkan.VkPipelineLayoutCreateInfo;
+import org.lwjgl.vulkan.VkPipelineShaderStageCreateInfo;
+import org.lwjgl.vulkan.VkPipelineVertexInputStateCreateInfo;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.util.UtilL.*;
-import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkShader implements VkDestroyable, VkGpuCtx{
+	
 	
 	public enum Type{
 		FRAGMENT("frag", VK_SHADER_STAGE_FRAGMENT_BIT),
@@ -42,12 +50,14 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 	
 	public static final String SHADER_ROOT="assets/shaders/";
 	
-	private final String       name;
-	private final IDataManager shadersFolder;
-	private final VkGpu        gpu;
-	private final VkSurface    surface;
+	public final  String               name;
+	private final IDataManager         shadersFolder;
+	private final VkGpu                gpu;
+	private final VkSurface            surface;
+	private       long                 pipeline;
+	private       List<VkShaderModule> stages;
 	
-	private VkShaderModule[] stages;
+	private long pipelineLayout;
 	
 	/**
 	 * @param shadersFolder Has to point to a shaders folder (SHADER_ROOT)
@@ -62,62 +72,53 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 		this.surface=surface;
 	}
 	
-	public VkShader init(){
+	public VkShader init(ShaderState state, long renderPass){
+		
 		stages=Stream.of(loadStage(Type.VERTEX),
 		                 loadStage(Type.FRAGMENT),
 		                 loadStageOptional(Type.GEOMETRY))
 		             .filter(Objects::nonNull)
-		             .toArray(VkShaderModule[]::new);
+		             .collect(Collectors.toList());
+		
+		stages=Collections.unmodifiableList(stages);
 		
 		try(MemoryStack stack=stackPush()){
-			ByteBuffer name=stack.UTF8("main");
 			
-			VkPipelineShaderStageCreateInfo[] createInfos=Stream.of(stages)
-			                                                    .map(this::stageInfo)
-			                                                    .toArray(VkPipelineShaderStageCreateInfo[]::new);
+			VkPipelineLayoutCreateInfo pipelineLayoutInfo=VkPipelineLayoutCreateInfo.callocStack(stack);
+			pipelineLayoutInfo.sType(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
+			                  .pSetLayouts(null)
+			                  .pPushConstantRanges(null);
 			
-			VkPipelineVertexInputStateCreateInfo info=VkPipelineVertexInputStateCreateInfo.callocStack(stack);
-			info.sType(VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO)
-			    .pVertexBindingDescriptions(null)
-			    .pVertexAttributeDescriptions(null);
-			
-			VkDrawMode drawMode=VkDrawMode.TRIANGLES;
+			pipelineLayout=Vk.createPipelineLayout(gpu, pipelineLayoutInfo, stack.mallocLong(1));
 			
 			
+			VkPipelineShaderStageCreateInfo.Buffer shaderStages=VkPipelineShaderStageCreateInfo.callocStack(stages.size(), stack);
+			for(int i=0;i<stages.size();i++){
+				stages.get(i).write(shaderStages.get(i));
+			}
+			
+			VkPipelineVertexInputStateCreateInfo vertexInputInfo=VkPipelineVertexInputStateCreateInfo.callocStack(stack);
+			vertexInputInfo.sType(VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO)
+			               .pVertexBindingDescriptions(null)
+			               .pVertexAttributeDescriptions(null);
+			
+			VkGraphicsPipelineCreateInfo.Buffer pipelineInfo=VkGraphicsPipelineCreateInfo.callocStack(1, stack);
+			pipelineInfo.get(0)
+			            .sType(VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO)
+			            .pStages(shaderStages)
+			            .pVertexInputState(vertexInputInfo)
+			            .layout(pipelineLayout)
+			            .renderPass(renderPass)
+			            .basePipelineHandle(VK_NULL_HANDLE)
+			            .basePipelineIndex(-1);
+			state.write(pipelineInfo.get(0));
+			
+			
+			pipeline=Vk.createGraphicsPipelines(gpu, 0, pipelineInfo, stack.mallocLong(1));
 		}
 		return this;
 	}
 	
-	private VkPipelineShaderStageCreateInfo stageInfo(VkShaderModule stage){
-		VkPipelineShaderStageCreateInfo info=VkPipelineShaderStageCreateInfo.callocStack();
-		info.sType(VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO)
-		    .stage(VK_SHADER_STAGE_VERTEX_BIT)
-		    .module(stage.getHandle())
-		    .pName(stackUTF8("main"));
-		return info;
-	}
-	
-	
-	private VkPipelineViewportStateCreateInfo basicFullScreen(IVec2iR size){
-		
-		VkViewport.Buffer viewports=VkViewport.mallocStack(1);
-		viewports.get(0).set(0, 0, size.x(), size.y(), 0, 1);
-		
-		VkRect2D.Buffer scissors=VkRect2D.mallocStack(1);
-		
-		VkRect2D sc=scissors.get(0);
-		sc.offset().set(0, 0);
-		sc.extent().set(size.x(), size.y());
-		
-		VkPipelineViewportStateCreateInfo viewportInfo=VkPipelineViewportStateCreateInfo.callocStack();
-		viewportInfo.sType(VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO)
-		            .viewportCount(viewports.limit())
-		            .pViewports(viewports)
-		            .scissorCount(scissors.limit())
-		            .pScissors(scissors);
-		
-		return viewportInfo;
-	}
 	
 	private VkShaderModule loadStageOptional(Type type){
 		try{
@@ -162,12 +163,17 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 	
 	@Override
 	public void destroy(){
-		forEach(stages, VkShaderModule::destroy);
-		
+		vkDestroyPipeline(gpu.getDevice(), pipeline, null);
+		vkDestroyPipelineLayout(gpu.getDevice(), pipelineLayout, null);
+		stages.forEach(VkShaderModule::destroy);
 	}
 	
 	@Override
 	public VkGpu getGpu(){
 		return gpu;
+	}
+	
+	public List<VkShaderModule> getStages(){
+		return stages;
 	}
 }

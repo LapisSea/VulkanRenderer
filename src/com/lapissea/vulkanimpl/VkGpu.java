@@ -35,6 +35,19 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 				queue=Vk.createDeviceQueue(getDevice(), id, 0, stack.callocPointer(1));
 			}
 		}
+		
+		public long createCommandPool(){
+			try(MemoryStack stack=stackPush()){
+				/* VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT: Allow command buffers to be rerecorded individually, without this flag they all have to be reset together
+				 * VK_COMMAND_POOL_CREATE_TRANSIENT_BIT: Hint that command buffers are rerecorded with new commands very often (may change memory allocation behavior)
+				 */
+				VkCommandPoolCreateInfo poolInfo=VkCommandPoolCreateInfo.mallocStack(stack);
+				poolInfo.sType(VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO)
+				        .queueFamilyIndex(id)
+				        .flags();
+				return Vk.createCommandPool(getGpu(), poolInfo, stack.mallocLong(1));
+			}
+		}
 	}
 	
 	private final VulkanRenderer instance;
@@ -43,7 +56,8 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	private       VkDevice         logicalDevice;
 	
 	private VkPhysicalDeviceMemoryProperties memoryProperties;
-	private VkPhysicalDeviceFeatures         features;
+	private VkPhysicalDeviceFeatures         physicalFeatures;
+	private VkPhysicalDeviceProperties       physicalProperties;
 	private List<String>                     deviceExtensionProperties;
 	
 	private VkQueueFamilyProperties.Buffer queueFamilyProperties;
@@ -59,8 +73,10 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		memoryProperties=VkPhysicalDeviceMemoryProperties.malloc();
 		vkGetPhysicalDeviceMemoryProperties(physicalDevice, memoryProperties);
 		
-		features=VkPhysicalDeviceFeatures.malloc();
-		vkGetPhysicalDeviceFeatures(physicalDevice, features);
+		physicalFeatures=VkPhysicalDeviceFeatures.malloc();
+		vkGetPhysicalDeviceFeatures(physicalDevice, physicalFeatures);
+		physicalProperties=VkPhysicalDeviceProperties.malloc();
+		vkGetPhysicalDeviceProperties(physicalDevice, physicalProperties);
 		
 		
 		try(MemoryStack stack=stackPush()){
@@ -152,10 +168,10 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			
 		}
 		memoryProperties.free();
-		features.free();
+		physicalFeatures.free();
 		
 		memoryProperties=null;
-		features=null;
+		physicalFeatures=null;
 		logicalDevice=null;
 	}
 	
@@ -179,8 +195,12 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		return -1;
 	}
 	
-	public VkPhysicalDeviceFeatures getFeatures(){
-		return features;
+	public VkPhysicalDeviceFeatures getPhysicalFeatures(){
+		return physicalFeatures;
+	}
+	
+	public VkPhysicalDeviceProperties getPhysicalProperties(){
+		return physicalProperties;
 	}
 	
 	public VkPhysicalDeviceMemoryProperties getMemoryProperties(){
