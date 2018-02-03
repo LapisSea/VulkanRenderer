@@ -8,6 +8,7 @@ import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import com.lapissea.vulkanimpl.util.VkShaderCompiler;
+import com.lapissea.vulkanimpl.util.types.VkCommandBufferM;
 import com.lapissea.vulkanimpl.util.types.VkRenderPass;
 import com.lapissea.vulkanimpl.util.types.VkShaderModule;
 import com.lapissea.vulkanimpl.util.types.VkSurface;
@@ -173,6 +174,10 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 		}
 	}
 	
+	public void bind(VkCommandBufferM cmd){
+		vkCmdBindPipeline(cmd, isCompute()?VK_PIPELINE_BIND_POINT_COMPUTE:VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+	}
+	
 	@Override
 	public void destroy(){
 		vkDestroyPipeline(gpu.getDevice(), pipeline, null);
@@ -187,5 +192,9 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 	
 	public List<VkShaderModule> getStages(){
 		return stages;
+	}
+	
+	public boolean isCompute(){
+		return false;
 	}
 }

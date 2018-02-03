@@ -1,6 +1,7 @@
 package com.lapissea.vulkanimpl.util.types;
 
 import com.lapissea.vulkanimpl.VkGpu;
+import com.lapissea.vulkanimpl.shaders.VkShader;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkCommandBuffer;
@@ -46,4 +47,5 @@ public class VkCommandBufferM extends VkCommandBuffer implements VkGpuCtx{
 			vkBeginCommandBuffer(this, beginInfo);
 		}
 	}
+	
 }

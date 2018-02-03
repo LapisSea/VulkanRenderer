@@ -112,7 +112,7 @@ public class VulkanRenderer implements VkDestroyable{
 		initRenderPass();
 		initGraphicsPipeline();
 		graphicsPool=renderGpu.getGraphicsQueue().createCommandPool();
-		swapchain.initSwapchain(renderPass, graphicsPool);
+		swapchain.initSwapchain(renderPass, shader,graphicsPool);
 		initScene();
 	}
 	
@@ -259,7 +259,7 @@ public class VulkanRenderer implements VkDestroyable{
 				   type==VkDebugReport.Type.WARNING||
 				   type==VkDebugReport.Type.PERFORMANCE_WARNING)
 					throw new RuntimeException(msg.toString());
-				else LogUtil.println(msg);
+//				LogUtil.println(msg);
 			});
 		}
 		

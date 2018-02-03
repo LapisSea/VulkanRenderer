@@ -2,7 +2,9 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.vec.color.ColorM;
 import com.lapissea.vec.interf.IVec2iR;
+import com.lapissea.vulkanimpl.shaders.VkShader;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkImageAspect;
 import com.lapissea.vulkanimpl.util.types.*;
@@ -97,7 +99,7 @@ public class VkSwapchain implements VkDestroyable{
 	}
 	
 	
-	public void initSwapchain(VkRenderPass renderPass, VkCommandPool pool){
+	public void initSwapchain(VkRenderPass renderPass, VkShader shader, VkCommandPool pool){
 		
 		try(MemoryStack stack=stackPush()){
 			VkFramebufferCreateInfo framebufferInfo=VkFramebufferCreateInfo.callocStack(stack);
@@ -120,8 +122,8 @@ public class VkSwapchain implements VkDestroyable{
 			VkCommandBufferM frameBind=frameBinds[i];
 			
 			frameBind.begin();
-			renderPass.begin(framebuffers[i]);
-			
+			renderPass.begin(frameBind, framebuffers[i], surface.getSize(), new ColorM(0, 0, 0, 0));
+			shader.bind(frameBind);
 			
 		}
 	}
