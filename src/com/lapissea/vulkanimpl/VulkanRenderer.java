@@ -5,7 +5,6 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.event.change.ChangeRegistryBool;
-import com.lapissea.util.filechange.FileChageDetector;
 import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.devonly.ValidationLayers;
 import com.lapissea.vulkanimpl.devonly.VkDebugReport;
@@ -13,14 +12,17 @@ import com.lapissea.vulkanimpl.shaders.ShaderState;
 import com.lapissea.vulkanimpl.shaders.VkShader;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
-import com.lapissea.vulkanimpl.util.VkShaderCompiler;
+import com.lapissea.vulkanimpl.util.types.VkCommandPool;
+import com.lapissea.vulkanimpl.util.types.VkRenderPass;
 import com.lapissea.vulkanimpl.util.types.VkSurface;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
-import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -62,20 +64,21 @@ public class VulkanRenderer implements VkDestroyable{
 	
 	private VkInstance instance;
 	
-	private VkGpu renderGpu, computeGpu;
+	private VkGpu renderGpu;
+//	private VkGpu computeGpu;
 	
 	private VkSwapchain  swapchain;
 	private GlfwWindowVk window;
 	
 	private VkSurface surface;
 	
-	private VkShader shader;
-	private long     renderPass;
+	private VkShader     shader;
+	private VkRenderPass renderPass;
 	
 	private Settings settings=new Settings();
 	public IDataManager assets;
 	
-	private long commandPool;
+	private VkCommandPool graphicsPool;
 	
 	public VulkanRenderer(IDataManager assets){
 		this.assets=assets;
@@ -86,7 +89,6 @@ public class VulkanRenderer implements VkDestroyable{
 		window.size.register(e->onWindowResize(e.getSource()));
 		
 		try(MemoryStack stack=stackPush()){
-			
 			
 			List<String> layerNames=new ArrayList<>(), extensionNames=new ArrayList<>();
 			
@@ -109,6 +111,13 @@ public class VulkanRenderer implements VkDestroyable{
 		
 		initRenderPass();
 		initGraphicsPipeline();
+		graphicsPool=renderGpu.getGraphicsQueue().createCommandPool();
+		swapchain.initSwapchain(renderPass, graphicsPool);
+		initScene();
+	}
+	
+	private void initScene(){
+	
 	}
 	
 	private void initRenderPass(){
@@ -212,23 +221,23 @@ public class VulkanRenderer implements VkDestroyable{
 			              .sorted(sort)
 			              .findFirst()
 			              .orElseThrow(()->new RuntimeException("No Vulkan compatible devices can display to a screen or do not meet minimal requirements"));
-			
-			computeGpu=gpus.stream()
-			               .filter(gpu->gpu.getDeviceExtensionProperties().containsAll(computeExtensions)&&gpu.getTransferQueue()!=null)
-			               .sorted(sort.thenComparing((g1, g2)->Boolean.compare(g1==renderGpu, g2==renderGpu)))
-			               .findFirst()
-			               .orElseThrow(()->new RuntimeException("No Vulkan compatible devices can display to a screen or do not meet minimal requirements"));
+
+//			computeGpu=gpus.stream()
+//			               .filter(gpu->gpu.getDeviceExtensionProperties().containsAll(computeExtensions)&&gpu.getTransferQueue()!=null)
+//			               .sorted(sort.thenComparing((g1, g2)->Boolean.compare(g1==renderGpu, g2==renderGpu)))
+//			               .findFirst()
+//			               .orElseThrow(()->new RuntimeException("No Vulkan compatible devices can display to a screen or do not meet minimal requirements"));
 			
 			gpus.remove(renderGpu);
-			gpus.remove(computeGpu);
+//			gpus.remove(computeGpu);
 			gpus.forEach(VkGpu::destroy);
-			
-			if(renderGpu==computeGpu){
-				renderGpu.init(null, Vk.stringsToPP(Stream.concat(renderExtensions.stream(), computeExtensions.stream()).distinct().collect(Collectors.toList()), stack));
-			}else{
-				renderGpu.init(null, Vk.stringsToPP(renderExtensions, stack));
-				computeGpu.init(null, Vk.stringsToPP(computeExtensions, stack));
-			}
+
+//			if(renderGpu==computeGpu){
+			renderGpu.init(null, Vk.stringsToPP(Stream.concat(renderExtensions.stream(), computeExtensions.stream()).distinct().collect(Collectors.toList()), stack));
+//			}else{
+//				renderGpu.init(null, Vk.stringsToPP(renderExtensions, stack));
+//				computeGpu.init(null, Vk.stringsToPP(computeExtensions, stack));
+//			}
 		}
 	}
 	
@@ -246,18 +255,17 @@ public class VulkanRenderer implements VkDestroyable{
 				if(msgLin.size()>1) msg.append("\n").append(TextUtil.wrappedString(UtilL.array(msgLin)));
 				else msg.append(msgLin.get(0));
 				
-				if(type==VkDebugReport.Type.ERROR||type==VkDebugReport.Type.WARNING) throw new RuntimeException(msg.toString());
-//				else LogUtil.println(msg);
+				if(type==VkDebugReport.Type.ERROR||
+				   type==VkDebugReport.Type.WARNING||
+				   type==VkDebugReport.Type.PERFORMANCE_WARNING)
+					throw new RuntimeException(msg.toString());
+				else LogUtil.println(msg);
 			});
 		}
 		
 	}
 	
 	private void initGraphicsPipeline(){
-		if(DEVELOPMENT){
-			FileChageDetector.autoHandle(new File("res/assets/shaders/test.vert"), ()->VkShaderCompiler.compileVertex("test.vert"));
-			FileChageDetector.autoHandle(new File("res/assets/shaders/test.frag"), ()->VkShaderCompiler.compileFragment("test.frag"));
-		}
 		
 		shader=new VkShader(assets.subData("assets/shaders"), "test", getRenderGpu(), surface);
 		ShaderState state=new ShaderState();
@@ -266,7 +274,7 @@ public class VulkanRenderer implements VkDestroyable{
 	}
 	
 	private void onWindowResize(IVec2iR size){
-		LogUtil.println(size);
+//		LogUtil.println(size);
 	}
 	
 	public void render(){
@@ -280,10 +288,10 @@ public class VulkanRenderer implements VkDestroyable{
 	public VkGpu getRenderGpu(){
 		return renderGpu;
 	}
-	
-	public VkGpu getComputeGpu(){
-		return computeGpu;
-	}
+
+//	public VkGpu getComputeGpu(){
+//		return computeGpu;
+//	}
 	
 	public GlfwWindowVk getWindow(){
 		return window;
@@ -299,8 +307,7 @@ public class VulkanRenderer implements VkDestroyable{
 	
 	@Override
 	public void destroy(){
-		
-		vkDestroyRenderPass(renderGpu.getDevice(), renderPass, null);
+		renderPass.destroy();
 		shader.destroy();
 		
 		swapchain.destroy();

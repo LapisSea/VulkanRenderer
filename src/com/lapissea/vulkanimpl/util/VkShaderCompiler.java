@@ -6,6 +6,7 @@ import com.lapissea.util.UtilL;
 import java.io.*;
 import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.stream.Collectors;
 
 import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 
@@ -19,7 +20,7 @@ public class VkShaderCompiler{
 		compile(file, ".frag");
 	}
 	
-	private static void compile(String file, String type){
+	public static void compile(String file, String type){
 		LogUtil.println("Compiling", file);
 		File glslSrcFile=new File("res\\assets\\shaders", file);
 		if(!glslSrcFile.exists()) throw UtilL.uncheckedThrow(new FileNotFoundException());
@@ -69,19 +70,22 @@ public class VkShaderCompiler{
 					if(i>0) out.append(new String(b, 0, i));
 				}
 			}
-			int    startCut=command.length()+target.getAbsolutePath().length()+n.length();
-			int    endCut  =new File("").getAbsolutePath().length()+">exit".length()+n.length()*2;
-			String output  =out.toString().substring(startCut, out.length()-endCut);
-			if(!output.isEmpty()){
+			String errorMark="ERROR: ";
+			String errors=Arrays.stream(out.toString().split("\\r?\\n"))
+			                    .filter(s->s.startsWith(errorMark))
+			                    .map(s->s.substring(errorMark.length()))
+			                    .collect(Collectors.joining("\n"));
+			
+			if(!errors.isEmpty()){
 				if(DEVELOPMENT){
 					File f     =new File(glslSrcFile+".log");
 					File parent=f.getParentFile();
 					f=new File(parent, "DEVELOPMENT\\"+f.getName());
 					f.getParentFile().mkdirs();
 					
-					Files.write(f.toPath(), output.getBytes());
+					Files.write(f.toPath(), errors.getBytes());
 				}
-				LogUtil.printEr("Shader "+file+" failed to compile!\n"+output);
+				LogUtil.printEr("Shader "+file+" failed to compile!\n"+errors);
 				throw new IllegalStateException();
 			}
 			

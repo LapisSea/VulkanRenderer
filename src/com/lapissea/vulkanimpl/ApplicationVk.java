@@ -3,6 +3,8 @@ package com.lapissea.vulkanimpl;
 import com.lapissea.datamanager.DataManager;
 import com.lapissea.glfw.GlfwMonitor;
 import com.lapissea.glfw.GlfwWindow;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.NanoTimer;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import gnu.trove.list.TIntList;
@@ -49,8 +51,15 @@ public class ApplicationVk{
 		
 		setUpWindow();
 		
+		NanoTimer timer=new NanoTimer();
+		
+		timer.start();
 		vkRenderer.createContext(gameWindow);
+		timer.end();
+		
 		gameWindow.show();
+		
+		LogUtil.println("Engine initialized in", timer.s(), "seconds");
 	}
 	
 	private void setUpWindow(){

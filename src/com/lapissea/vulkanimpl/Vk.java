@@ -11,8 +11,7 @@ package com.lapissea.vulkanimpl;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
-import com.lapissea.vulkanimpl.util.types.VkImage;
-import com.lapissea.vulkanimpl.util.types.VkSurface;
+import com.lapissea.vulkanimpl.util.types.*;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import org.lwjgl.PointerBuffer;
@@ -317,10 +316,10 @@ public class Vk{
 		return dest.get(0);
 	}
 	
-	public static long createRenderPass(VkGpuCtx gpu, VkRenderPassCreateInfo info, LongBuffer dest){
+	public static VkRenderPass createRenderPass(VkGpuCtx gpu, VkRenderPassCreateInfo info, LongBuffer dest){
 		int code=vkCreateRenderPass(gpu.getDevice(), info, null, dest);
 		if(DEVELOPMENT) check(code);
-		return dest.get(0);
+		return new VkRenderPass(gpu.getGpu(), dest.get(0));
 	}
 	
 	public static long createGraphicsPipelines(VkGpuCtx gpu, long cache, VkGraphicsPipelineCreateInfo.Buffer pipelineInfo, LongBuffer dest){
@@ -358,10 +357,20 @@ public class Vk{
 		return dest.get(0);
 	}
 	
-	public static long createCommandPool(VkGpuCtx gpuCtx, VkCommandPoolCreateInfo poolInfo, LongBuffer dest){
+	public static VkCommandPool createCommandPool(VkGpuCtx gpuCtx, VkCommandPoolCreateInfo poolInfo, LongBuffer dest){
 		int code=vkCreateCommandPool(gpuCtx.getDevice(), poolInfo, null, dest);
 		if(DEVELOPMENT) check(code);
-		return dest.get(0);
+		return new VkCommandPool(gpuCtx.getGpu(), dest.get(0));
+	}
+	
+	public static VkCommandBufferM[] allocateCommandBuffers(VkGpu gpu, VkCommandPool pool, VkCommandBufferAllocateInfo allocInfo, PointerBuffer dest){
+		allocInfo.commandPool(pool.getHandle());
+		
+		int code=vkAllocateCommandBuffers(gpu.getDevice(), allocInfo, dest);
+		if(DEVELOPMENT) check(code);
+		VkCommandBufferM[] res=new VkCommandBufferM[allocInfo.commandBufferCount()];
+		for(int i=0;i<res.length;i++) res[i]=new VkCommandBufferM(dest.get(i), pool, allocInfo.level()==VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+		return res;
 	}
 	
 	/*/START_GEN/*/

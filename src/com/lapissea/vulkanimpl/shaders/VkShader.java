@@ -1,14 +1,14 @@
 package com.lapissea.vulkanimpl.shaders;
 
 import com.lapissea.datamanager.IDataManager;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.NanoTimer;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.filechange.FileChageDetector;
 import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
-import com.lapissea.vulkanimpl.util.types.VkPipelineCache;
+import com.lapissea.vulkanimpl.util.VkShaderCompiler;
+import com.lapissea.vulkanimpl.util.types.VkRenderPass;
 import com.lapissea.vulkanimpl.util.types.VkShaderModule;
 import com.lapissea.vulkanimpl.util.types.VkSurface;
 import org.lwjgl.system.MemoryStack;
@@ -18,15 +18,18 @@ import org.lwjgl.vulkan.VkPipelineShaderStageCreateInfo;
 import org.lwjgl.vulkan.VkPipelineVertexInputStateCreateInfo;
 
 import java.io.BufferedInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
@@ -72,14 +75,23 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 		this.surface=surface;
 	}
 	
-	public VkShader init(ShaderState state, long renderPass){
+	public VkShader init(ShaderState state, VkRenderPass renderPass){
+		if(DEVELOPMENT){
+			
+			BiConsumer<String, String> winComp=(fileName, type)->{
+				File target=new File("res/assets/shaders", fileName);
+				if(!target.exists()) return;
+				
+				FileChageDetector.autoHandle(target, new File("dev/assets/shaders", fileName+".track"), ()->VkShaderCompiler.compile(fileName, type));
+			};
+			Arrays.stream(Type.values()).parallel().map(t->"."+t.extension).forEach(type->winComp.accept(name+type, type));
+		}
 		
 		stages=Stream.of(loadStage(Type.VERTEX),
 		                 loadStage(Type.FRAGMENT),
 		                 loadStageOptional(Type.GEOMETRY))
 		             .filter(Objects::nonNull)
 		             .collect(Collectors.toList());
-		
 		stages=Collections.unmodifiableList(stages);
 		
 		try(MemoryStack stack=stackPush()){
@@ -108,7 +120,7 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 			            .pStages(shaderStages)
 			            .pVertexInputState(vertexInputInfo)
 			            .layout(pipelineLayout)
-			            .renderPass(renderPass)
+			            .renderPass(renderPass.getHandle())
 			            .basePipelineHandle(VK_NULL_HANDLE)
 			            .basePipelineIndex(-1);
 			state.write(pipelineInfo.get(0));

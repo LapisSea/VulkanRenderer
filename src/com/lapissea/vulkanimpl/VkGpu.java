@@ -2,6 +2,7 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
+import com.lapissea.vulkanimpl.util.types.VkCommandPool;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.lwjgl.PointerBuffer;
@@ -36,15 +37,16 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			}
 		}
 		
-		public long createCommandPool(){
+		public VkCommandPool createCommandPool(){
 			try(MemoryStack stack=stackPush()){
 				/* VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT: Allow command buffers to be rerecorded individually, without this flag they all have to be reset together
 				 * VK_COMMAND_POOL_CREATE_TRANSIENT_BIT: Hint that command buffers are rerecorded with new commands very often (may change memory allocation behavior)
 				 */
 				VkCommandPoolCreateInfo poolInfo=VkCommandPoolCreateInfo.mallocStack(stack);
-				poolInfo.sType(VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO)
+				poolInfo.pNext(0)
+				        .sType(VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO)
 				        .queueFamilyIndex(id)
-				        .flags();
+				        .flags(0);
 				return Vk.createCommandPool(getGpu(), poolInfo, stack.mallocLong(1));
 			}
 		}
