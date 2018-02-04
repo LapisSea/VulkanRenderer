@@ -5,6 +5,7 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.event.change.ChangeRegistryBool;
+import com.lapissea.vec.color.ColorM;
 import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.devonly.ValidationLayers;
 import com.lapissea.vulkanimpl.devonly.VkDebugReport;
@@ -12,9 +13,7 @@ import com.lapissea.vulkanimpl.shaders.ShaderState;
 import com.lapissea.vulkanimpl.shaders.VkShader;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
-import com.lapissea.vulkanimpl.util.types.VkCommandPool;
-import com.lapissea.vulkanimpl.util.types.VkRenderPass;
-import com.lapissea.vulkanimpl.util.types.VkSurface;
+import com.lapissea.vulkanimpl.util.types.*;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
@@ -80,6 +79,8 @@ public class VulkanRenderer implements VkDestroyable{
 	
 	private VkCommandPool graphicsPool;
 	
+	private VkSemaphore swapchainImageAviable,sceneRenderFinish;
+	
 	public VulkanRenderer(IDataManager assets){
 		this.assets=assets;
 	}
@@ -112,12 +113,27 @@ public class VulkanRenderer implements VkDestroyable{
 		initRenderPass();
 		initGraphicsPipeline();
 		graphicsPool=renderGpu.getGraphicsQueue().createCommandPool();
-		swapchain.initSwapchain(renderPass, shader,graphicsPool);
+		
+		swapchain.initSwapchain(renderPass);
 		initScene();
 	}
 	
 	private void initScene(){
-	
+		
+		VkCommandBufferM[] sceneDrawBuffer=graphicsPool.allocateCommandBuffers(swapchain.getFramebufferCount());
+		
+		for(int i=0;i<swapchain.getFramebufferCount();i++){
+			VkCommandBufferM sceneBuffer=sceneDrawBuffer[i];
+			
+			sceneBuffer.begin();
+			renderPass.begin(sceneBuffer, swapchain.getFramebuffer(i), surface.getSize(), new ColorM(0, 0, 0, 0));
+			
+			shader.bind(sceneBuffer);
+			sceneBuffer.render(3);
+			
+			sceneBuffer.endRenderPass();
+			sceneBuffer.end();
+		}
 	}
 	
 	private void initRenderPass(){

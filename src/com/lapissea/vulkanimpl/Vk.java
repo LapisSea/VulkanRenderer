@@ -373,6 +373,16 @@ public class Vk{
 		return res;
 	}
 	
+	public static void beginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferBeginInfo beginInfo){
+		int code=vkBeginCommandBuffer(commandBuffer,beginInfo);
+		if(DEVELOPMENT) check(code);
+	}
+	
+	public static void endCommandBuffer(VkCommandBuffer commandBuffer){
+		int code=vkEndCommandBuffer(commandBuffer);
+		if(DEVELOPMENT) check(code);
+	}
+	
 	/*/START_GEN/*/
 	//lel
 	

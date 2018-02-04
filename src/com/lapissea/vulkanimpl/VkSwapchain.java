@@ -2,12 +2,13 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
-import com.lapissea.vec.color.ColorM;
 import com.lapissea.vec.interf.IVec2iR;
-import com.lapissea.vulkanimpl.shaders.VkShader;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkImageAspect;
-import com.lapissea.vulkanimpl.util.types.*;
+import com.lapissea.vulkanimpl.util.types.VkCommandBufferM;
+import com.lapissea.vulkanimpl.util.types.VkRenderPass;
+import com.lapissea.vulkanimpl.util.types.VkSurface;
+import com.lapissea.vulkanimpl.util.types.VkTexture;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
@@ -99,7 +100,7 @@ public class VkSwapchain implements VkDestroyable{
 	}
 	
 	
-	public void initSwapchain(VkRenderPass renderPass, VkShader shader, VkCommandPool pool){
+	public void initSwapchain(VkRenderPass renderPass){
 		
 		try(MemoryStack stack=stackPush()){
 			VkFramebufferCreateInfo framebufferInfo=VkFramebufferCreateInfo.callocStack(stack);
@@ -113,17 +114,6 @@ public class VkSwapchain implements VkDestroyable{
 			framebuffers=Stream.of(colorFrames)
 			                   .mapToLong(c->Vk.createFrameBuffer(gpu, framebufferInfo.pAttachments(view.put(0, c.getView())), lb))
 			                   .toArray();
-			
-		}
-		
-		frameBinds=pool.allocateCommandBuffer(framebuffers.length);
-		
-		for(int i=0;i<frameBinds.length;i++){
-			VkCommandBufferM frameBind=frameBinds[i];
-			
-			frameBind.begin();
-			renderPass.begin(frameBind, framebuffers[i], surface.getSize(), new ColorM(0, 0, 0, 0));
-			shader.bind(frameBind);
 			
 		}
 	}
@@ -179,5 +169,13 @@ public class VkSwapchain implements VkDestroyable{
 	
 	public int getFormat(){
 		return format;
+	}
+	
+	public int getFramebufferCount(){
+		return framebuffers.length;
+	}
+	
+	public long getFramebuffer(int i){
+		return framebuffers[i];
 	}
 }

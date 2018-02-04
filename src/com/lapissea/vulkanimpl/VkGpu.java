@@ -3,6 +3,7 @@ package com.lapissea.vulkanimpl;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import com.lapissea.vulkanimpl.util.types.VkCommandPool;
+import com.lapissea.vulkanimpl.util.types.VkSemaphore;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.lwjgl.PointerBuffer;
@@ -250,5 +251,11 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	@Override
 	public VkDevice getDevice(){
 		return logicalDevice;
+	}
+	
+	public VkSemaphore createSemaphore(){
+		try(MemoryStack stack=stackPush()){
+		
+		}
 	}
 }

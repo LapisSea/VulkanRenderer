@@ -1,7 +1,7 @@
 package com.lapissea.vulkanimpl.util.types;
 
+import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
-import com.lapissea.vulkanimpl.shaders.VkShader;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkCommandBuffer;
@@ -23,7 +23,7 @@ public class VkCommandBufferM extends VkCommandBuffer implements VkGpuCtx{
 	}
 	
 	public VkCommandBufferM[] createSecondary(int count){
-		return pool.allocateCommandBuffer(count, this);
+		return pool.allocateCommandBuffers(count, this);
 	}
 	
 	@Override
@@ -44,8 +44,19 @@ public class VkCommandBufferM extends VkCommandBuffer implements VkGpuCtx{
 				beginInfo.pInheritanceInfo(inheritanceInfo);
 			}
 			
-			vkBeginCommandBuffer(this, beginInfo);
+			Vk.beginCommandBuffer(this, beginInfo);
 		}
 	}
 	
+	public void render(int vertexCount){
+		vkCmdDraw(this, vertexCount, 1, 0, 0);
+	}
+	
+	public void endRenderPass(){
+		vkCmdEndRenderPass(this);
+	}
+	
+	public void end(){
+		Vk.endCommandBuffer(this);
+	}
 }

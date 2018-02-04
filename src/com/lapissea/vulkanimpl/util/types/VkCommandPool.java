@@ -22,19 +22,19 @@ public class VkCommandPool implements VkDestroyable, VkGpuCtx{
 	}
 	
 	public VkCommandBufferM allocateCommandBuffer(){
-		return allocateCommandBuffer(1)[0];
+		return allocateCommandBuffers(1)[0];
 	}
 	
-	public VkCommandBufferM[] allocateCommandBuffer(int count, VkCommandBufferM primary){
+	public VkCommandBufferM[] allocateCommandBuffers(int count, VkCommandBufferM primary){
 		if(!primary.isPrimary) throw new RuntimeException("Can't make secondary buffer from a secondary buffer!");
-		return allocateCommandBuffer(count, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+		return allocateCommandBuffers(count, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 	}
 	
-	public VkCommandBufferM[] allocateCommandBuffer(int count){
-		return allocateCommandBuffer(count, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+	public VkCommandBufferM[] allocateCommandBuffers(int count){
+		return allocateCommandBuffers(count, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 	}
 	
-	private VkCommandBufferM[] allocateCommandBuffer(int count, int level){
+	private VkCommandBufferM[] allocateCommandBuffers(int count, int level){
 		try(MemoryStack stack=stackPush()){
 			VkCommandBufferAllocateInfo allocInfo=VkCommandBufferAllocateInfo.callocStack(stack);
 			allocInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO)
