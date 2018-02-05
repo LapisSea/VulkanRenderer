@@ -254,8 +254,10 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	}
 	
 	public VkSemaphore createSemaphore(){
-		try(MemoryStack stack=stackPush()){
-		
+		try(VkSemaphoreCreateInfo info=VkSemaphoreCreateInfo.calloc()){
+			info.sType(VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO);
+			return Vk.createSemaphore(this, info);
 		}
 	}
+	
 }

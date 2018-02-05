@@ -374,13 +374,21 @@ public class Vk{
 	}
 	
 	public static void beginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferBeginInfo beginInfo){
-		int code=vkBeginCommandBuffer(commandBuffer,beginInfo);
+		int code=vkBeginCommandBuffer(commandBuffer, beginInfo);
 		if(DEVELOPMENT) check(code);
 	}
 	
 	public static void endCommandBuffer(VkCommandBuffer commandBuffer){
 		int code=vkEndCommandBuffer(commandBuffer);
 		if(DEVELOPMENT) check(code);
+	}
+	
+	public static VkSemaphore createSemaphore(VkGpuCtx gpuCtx, VkSemaphoreCreateInfo semaphoreInfo){
+		LongBuffer dest=memAllocLong(1);
+		
+		int code=VK10.vkCreateSemaphore(gpuCtx.getDevice(), semaphoreInfo, null, dest);
+		if(DEVELOPMENT) check(code);
+		return new VkSemaphore(gpuCtx.getGpu(), dest);
 	}
 	
 	/*/START_GEN/*/
