@@ -1,12 +1,12 @@
 package com.lapissea.vulkanimpl.devonly;
 
-import java.util.Collection;
+import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 
-import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
+import java.util.Collection;
 
 public class ValidationLayers{
 	
-	static{ if(!DEVELOPMENT) throw new RuntimeException(); }
+	static{ DevelopmentInfo.checkOnLoad(); }
 	
 	public static void addLayers(Collection<String> layers){
 		
@@ -14,9 +14,5 @@ public class ValidationLayers{
 		
 	}
 	
-	
-	public static void initLogging(){
-	
-	}
 	
 }

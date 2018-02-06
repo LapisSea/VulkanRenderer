@@ -5,6 +5,7 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.UnsafeConsumer;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.Vk;
+import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 
 import java.io.*;
 import java.lang.reflect.Method;
@@ -13,12 +14,9 @@ import java.util.*;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
-import static com.lapissea.vulkanimpl.VulkanRenderer.*;
-import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
-
 public class Generator_Vk{
 	
-	static{ if(!DEVELOPMENT) throw new RuntimeException(); }
+	static{ DevelopmentInfo.checkOnLoad(); }
 	
 	interface Gen{
 		void print(UnsafeConsumer<String, IOException> out) throws IOException;
@@ -175,7 +173,7 @@ public class Generator_Vk{
 		return out->{
 			out.accept("public static <<TODO>> "+vkName+"("+args+"){");
 			out.accept("\tint code="+methodName+"("+argList+")");
-			out.accept("\tif(DEVELOPMENT) check(code);");
+			out.accept("\tif(DEV_ON) check(code);");
 			out.accept("\treturn dest.get(0)");
 			out.accept("}");
 			out.accept("");

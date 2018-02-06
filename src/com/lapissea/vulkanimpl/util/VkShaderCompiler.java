@@ -8,8 +8,6 @@ import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
-
 public class VkShaderCompiler{
 	
 	public static void compileVertex(String file){
@@ -77,10 +75,10 @@ public class VkShaderCompiler{
 			                    .collect(Collectors.joining("\n"));
 			
 			if(!errors.isEmpty()){
-				if(DEVELOPMENT){
+				if(DevelopmentInfo.DEV_ON){
 					File f     =new File(glslSrcFile+".log");
 					File parent=f.getParentFile();
-					f=new File(parent, "DEVELOPMENT\\"+f.getName());
+					f=new File(parent, "DEV_ON\\"+f.getName());
 					f.getParentFile().mkdirs();
 					
 					Files.write(f.toPath(), errors.getBytes());

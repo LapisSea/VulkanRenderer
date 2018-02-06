@@ -4,6 +4,7 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.shaders.VkShader;
+import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.PointerBuffer;
@@ -15,7 +16,6 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.LongBuffer;
 
-import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 import static java.nio.ByteOrder.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
@@ -33,7 +33,7 @@ public class VkPipelineCache implements VkDestroyable, VkGpuCtx{
 //			System.exit(0);
 			LongBuffer dest=stack.mallocLong(1);
 			int        code=vkCreatePipelineCache(shader.getGpu().getDevice(), cacheInfo, null, dest);
-			if(DEVELOPMENT) Vk.check(code);
+			if(DevelopmentInfo.DEV_ON) Vk.check(code);
 			return new VkPipelineCache(dest.get(0), shader);
 		}finally{
 			if(data!=null) memFree(data);

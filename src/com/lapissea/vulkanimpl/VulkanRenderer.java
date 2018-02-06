@@ -1,7 +1,6 @@
 package com.lapissea.vulkanimpl;
 
 import com.lapissea.datamanager.IDataManager;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.event.change.ChangeRegistryBool;
@@ -13,11 +12,16 @@ import com.lapissea.vulkanimpl.shaders.ShaderState;
 import com.lapissea.vulkanimpl.shaders.VkShader;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
-import com.lapissea.vulkanimpl.util.types.*;
+import com.lapissea.vulkanimpl.util.types.VkCommandBufferM;
+import com.lapissea.vulkanimpl.util.types.VkCommandPool;
+import com.lapissea.vulkanimpl.util.types.VkRenderPass;
+import com.lapissea.vulkanimpl.util.types.VkSurface;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
+import java.nio.IntBuffer;
+import java.nio.LongBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -25,7 +29,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
+import static com.lapissea.vulkanimpl.devonly.VkDebugReport.Type.*;
+import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.EXTDebugReport.*;
@@ -35,22 +40,6 @@ import static org.lwjgl.vulkan.VK10.*;
 public class VulkanRenderer implements VkDestroyable{
 	
 	public static class Settings{
-		
-		public static final boolean DEVELOPMENT;
-		
-		static{
-			String key="VulkanRenderer.devMode",
-				devArg0=System.getProperty(key, "false"),
-				devArg=devArg0.toLowerCase();
-			
-			if(devArg.equals("true")) DEVELOPMENT=true;
-			else{
-				if(devArg.equals("false")) DEVELOPMENT=false;
-				else throw UtilL.exitWithErrorMsg("Invalid property: "+key+"="+devArg0+" (valid: \"true\", \"false\", \"\")");
-			}
-			System.setProperty("org.lwjgl.util.NoChecks", Boolean.toString(DEVELOPMENT));
-			LogUtil.println("Running VulkanRenderer in "+(DEVELOPMENT?"development":"production")+" mode");
-		}
 		
 		public ChangeRegistryBool enableVsync           =new ChangeRegistryBool(true);
 		public ChangeRegistryBool enableTrippleBuffering=new ChangeRegistryBool(true);
@@ -77,9 +66,8 @@ public class VulkanRenderer implements VkDestroyable{
 	private Settings settings=new Settings();
 	public IDataManager assets;
 	
-	private VkCommandPool graphicsPool;
-	
-	private VkSemaphore swapchainImageAviable,sceneRenderFinish;
+	private VkCommandPool      graphicsPool;
+	private VkCommandBufferM[] sceneCommandBuffers;
 	
 	public VulkanRenderer(IDataManager assets){
 		this.assets=assets;
@@ -103,7 +91,10 @@ public class VulkanRenderer implements VkDestroyable{
 			
 			instance=Vk.createInstance(info, null);
 		}
-		initDebugLog();
+		
+		if(DEV_ON){
+			debugReport=new VkDebugReport(this, List.of(ERROR, WARNING, PERFORMANCE_WARNING), List.of());
+		}
 		
 		surface=window.createSurface(this);
 		intGpus();
@@ -114,16 +105,16 @@ public class VulkanRenderer implements VkDestroyable{
 		initGraphicsPipeline();
 		graphicsPool=renderGpu.getGraphicsQueue().createCommandPool();
 		
-		swapchain.initSwapchain(renderPass);
+		swapchain.initFrameBuffers(renderPass);
 		initScene();
 	}
 	
 	private void initScene(){
 		
-		VkCommandBufferM[] sceneDrawBuffer=graphicsPool.allocateCommandBuffers(swapchain.getFramebufferCount());
+		sceneCommandBuffers=graphicsPool.allocateCommandBuffers(swapchain.getFramebufferCount());
 		
 		for(int i=0;i<swapchain.getFramebufferCount();i++){
-			VkCommandBufferM sceneBuffer=sceneDrawBuffer[i];
+			VkCommandBufferM sceneBuffer=sceneCommandBuffers[i];
 			
 			sceneBuffer.begin();
 			renderPass.begin(sceneBuffer, swapchain.getFramebuffer(i), surface.getSize(), new ColorM(0, 0, 0, 0));
@@ -161,10 +152,21 @@ public class VulkanRenderer implements VkDestroyable{
 			         .colorAttachmentCount(colorAttachmentRef.limit())
 			         .pColorAttachments(colorAttachmentRef);
 			
+			
+			VkSubpassDependency.Buffer dependency=VkSubpassDependency.callocStack(1, stack);
+			dependency.get(0)
+			          .srcSubpass(VK_SUBPASS_EXTERNAL)
+			          .dstSubpass(0)
+			          .srcStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)//wait for swapchain to finish reading the image that is presented
+			          .srcAccessMask(0)
+			          .dstStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+			          .dstAccessMask(VK_ACCESS_COLOR_ATTACHMENT_READ_BIT|VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+			
 			VkRenderPassCreateInfo renderPassInfo=VkRenderPassCreateInfo.callocStack(stack);
 			renderPassInfo.sType(VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO)
 			              .pAttachments(attachments)
-			              .pSubpasses(subpasses);
+			              .pSubpasses(subpasses)
+			              .pDependencies(dependency);
 			renderPass=Vk.createRenderPass(renderGpu, renderPassInfo, stack.mallocLong(1));
 			
 		}
@@ -184,7 +186,7 @@ public class VulkanRenderer implements VkDestroyable{
 	
 	private void initAddons(MemoryStack stack, List<String> layerNames, List<String> extensionNames){
 		
-		if(DEVELOPMENT){
+		if(DEV_ON){
 			ValidationLayers.addLayers(layerNames);
 			
 			extensionNames.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
@@ -257,36 +259,13 @@ public class VulkanRenderer implements VkDestroyable{
 		}
 	}
 	
-	private void initDebugLog(){
-		if(!DEVELOPMENT) return;
-		
-		try(MemoryStack stack=stackPush()){
-			
-			debugReport=new VkDebugReport(this, stack, (type, prefix, code, message)->{
-				if(message.startsWith("Device Extension")) return;
-				
-				List<String>  msgLin=TextUtil.wrapLongString(message, 100);
-				StringBuilder msg   =new StringBuilder().append(type).append(": [").append(prefix).append("] Code ").append(code).append(": ");
-				
-				if(msgLin.size()>1) msg.append("\n").append(TextUtil.wrappedString(UtilL.array(msgLin)));
-				else msg.append(msgLin.get(0));
-				
-				if(type==VkDebugReport.Type.ERROR||
-				   type==VkDebugReport.Type.WARNING||
-				   type==VkDebugReport.Type.PERFORMANCE_WARNING)
-					throw new RuntimeException(msg.toString());
-//				LogUtil.println(msg);
-			});
-		}
-		
-	}
-	
 	private void initGraphicsPipeline(){
 		
 		shader=new VkShader(assets.subData("assets/shaders"), "test", getRenderGpu(), surface);
 		ShaderState state=new ShaderState();
 		state.setViewport(window.size);
 		shader.init(state, renderPass);
+		
 	}
 	
 	private void onWindowResize(IVec2iR size){
@@ -294,7 +273,38 @@ public class VulkanRenderer implements VkDestroyable{
 	}
 	
 	public void render(){
-	
+//		if(UtilL.TRUE())return;
+		try(MemoryStack stack=stackPush()){
+			
+			
+			renderGpu.getSurfaceQueue().waitIdle();
+			IntBuffer imageIndex=swapchain.acquireNextImage();
+			
+			LongBuffer imgAviable  =swapchain.getImageAviable().getBuffer();
+			LongBuffer renderFinish=swapchain.getRenderFinish().getBuffer();
+			LongBuffer swapchains  =swapchain.getBuffer();
+			
+			VkSubmitInfo mainRenderSubmitInfo=VkSubmitInfo.callocStack(stack);
+			mainRenderSubmitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO)
+			                    .pWaitSemaphores(imgAviable)
+			                    .waitSemaphoreCount(imgAviable.limit())
+			                    .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT))
+			                    .pSignalSemaphores(renderFinish)
+			                    .pCommandBuffers(stack.pointers(sceneCommandBuffers));
+			
+			renderGpu.getGraphicsQueue().submit(mainRenderSubmitInfo);
+			
+			//push rendered image to screen
+			VkPresentInfoKHR presentInfo=VkPresentInfoKHR.callocStack(stack);
+			presentInfo.sType(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR)
+			           .pWaitSemaphores(renderFinish)
+			           .pSwapchains(swapchains)
+			           .swapchainCount(swapchains.limit())
+			           .pImageIndices(imageIndex);
+			
+			renderGpu.getSurfaceQueue().present(presentInfo);
+			
+		}
 	}
 	
 	public VkInstance getInstance(){
@@ -305,9 +315,7 @@ public class VulkanRenderer implements VkDestroyable{
 		return renderGpu;
 	}
 
-//	public VkGpu getComputeGpu(){
-//		return computeGpu;
-//	}
+//	public VkGpu getComputeGpu(){ return computeGpu; }
 	
 	public GlfwWindowVk getWindow(){
 		return window;
@@ -323,13 +331,15 @@ public class VulkanRenderer implements VkDestroyable{
 	
 	@Override
 	public void destroy(){
+		renderGpu.waitFor();
+		
 		renderPass.destroy();
 		shader.destroy();
 		
 		swapchain.destroy();
 		surface.destroy();
 		
-		if(DEVELOPMENT){
+		if(DEV_ON){
 			debugReport.destroy();
 		}
 		vkDestroyInstance(instance, null);

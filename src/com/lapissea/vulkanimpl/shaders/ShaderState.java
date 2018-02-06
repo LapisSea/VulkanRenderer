@@ -4,9 +4,9 @@ import com.lapissea.vec.Vec2i;
 import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.shaders.states.VkBlendMode;
 import com.lapissea.vulkanimpl.shaders.states.VkDrawMode;
+import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 import org.lwjgl.vulkan.*;
 
-import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -72,7 +72,7 @@ public class ShaderState{
 	
 	public void write(VkGraphicsPipelineCreateInfo pipelineInfo){
 		
-		if(DEVELOPMENT){
+		if(DevelopmentInfo.DEV_ON){
 			if(sampleLevel<0) throw new IllegalArgumentException("Sample power of 2 can not be negative!");
 			if(sampleLevel>=SAMPLE_LEVELS.length) throw new IllegalArgumentException((1<<sampleLevel)+" samples per pixel is to much!");
 		}

@@ -3,14 +3,12 @@ package com.lapissea.vulkanimpl;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vec.interf.IVec2iR;
+import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
+import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import com.lapissea.vulkanimpl.util.VkImageAspect;
-import com.lapissea.vulkanimpl.util.types.VkCommandBufferM;
-import com.lapissea.vulkanimpl.util.types.VkRenderPass;
-import com.lapissea.vulkanimpl.util.types.VkSurface;
-import com.lapissea.vulkanimpl.util.types.VkTexture;
+import com.lapissea.vulkanimpl.util.types.*;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
 import java.nio.IntBuffer;
@@ -18,21 +16,36 @@ import java.nio.LongBuffer;
 import java.util.stream.Stream;
 
 import static com.lapissea.util.UtilL.*;
-import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 import static org.lwjgl.system.MemoryStack.*;
+import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
 
-public class VkSwapchain implements VkDestroyable{
+public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	
-	private       long        handle;
+	public class Image{
+		private int         index;
+		private long        framebuffer;
+		private VkTexture   colorFrame;
+		private VkSemaphore imageAviable;
+		
+		public Image(int index, VkTexture colorFrame, VkSemaphore imageAviable){
+			this.index=index;
+			this.colorFrame=colorFrame;
+			this.imageAviable=imageAviable;
+		}
+	}
+	
+	private       LongBuffer  handle;
 	private final VkGpu       gpu;
-	private       VkTexture[] colorFrames;
 	private       int         format;
 	private       int         colorSpace;
 	private final VkSurface   surface;
-	private       long[]      framebuffers;
+	private       VkSemaphore renderFinish;
+	private       Image[]     images;
+	
+	private IntBuffer acquireNextImageMem=memAllocInt(1);
 	
 	private VkCommandBufferM[] frameBinds;
 	
@@ -42,6 +55,7 @@ public class VkSwapchain implements VkDestroyable{
 		try(MemoryStack stack=stackPush()){
 			create(gpu, surface, stack);
 		}
+		renderFinish=gpu.createSemaphore();
 	}
 	
 	private void create(VkGpu gpu, VkSurface surface, MemoryStack stack){
@@ -49,7 +63,7 @@ public class VkSwapchain implements VkDestroyable{
 		//acquire currency
 		IntBuffer count=stack.mallocInt(1);
 		Vk.getPhysicalDeviceSurfacePresentModesKHR(gpu.getPhysicalDevice(), surface, count, null);
-		IntBuffer presentModes=MemoryUtil.memAllocInt(count.get(0));
+		IntBuffer presentModes=memAllocInt(count.get(0));
 		
 		Vk.getPhysicalDeviceSurfacePresentModesKHR(gpu.getPhysicalDevice(), surface, count, presentModes);
 		
@@ -93,14 +107,19 @@ public class VkSwapchain implements VkDestroyable{
 		          .clipped(true)
 		          .oldSwapchain(VK_NULL_HANDLE);
 		
-		handle=Vk.createSwapchainKHR(gpu, createInfo, stack.mallocLong(1));
+		handle=memAllocLong(1);
+		Vk.createSwapchainKHR(gpu, createInfo, handle);
 		
-		colorFrames=UtilL.convert(Vk.getSwapchainImagesKHR(gpu, this, stack), VkTexture[]::new,
-		                          image->new VkTexture(image).createView(format.format(), VkImageAspect.COLOR));
+		VkTexture[] colors=UtilL.convert(Vk.getSwapchainImagesKHR(gpu, this, stack), VkTexture[]::new,
+		                                 image->new VkTexture(image).createView(format.format(), VkImageAspect.COLOR));
+		images=new Image[colors.length];
+		for(int i=0;i<colors.length;i++){
+			images[i]
+		}
 	}
 	
 	
-	public void initSwapchain(VkRenderPass renderPass){
+	public void initFrameBuffers(VkRenderPass renderPass){
 		
 		try(MemoryStack stack=stackPush()){
 			VkFramebufferCreateInfo framebufferInfo=VkFramebufferCreateInfo.callocStack(stack);
@@ -151,19 +170,33 @@ public class VkSwapchain implements VkDestroyable{
 		return VK_PRESENT_MODE_IMMEDIATE_KHR;
 	}
 	
+	public IntBuffer acquireNextImage(){
+		Vk.acquireNextImageKHR(getDevice(), this, imageAviable.getHandle(), VK_NULL_HANDLE, acquireNextImageMem);
+		return acquireNextImageMem;
+	}
+	
 	@Override
 	public void destroy(){
-		if(DEVELOPMENT&&handle==-1) throw new IllegalStateException("Swapchain already destroyed");
+		if(DevelopmentInfo.DEV_ON&&handle==null) throw new IllegalStateException("Swapchain already destroyed");
+		
+		memFree(acquireNextImageMem);
+		imageAviable.destroy();
+		renderFinish.destroy();
 		
 		for(long framebuffer : framebuffers){
 			vkDestroyFramebuffer(gpu.getDevice(), framebuffer, null);
 		}
 		forEach(colorFrames, VkTexture::destroy);
-		vkDestroySwapchainKHR(gpu.getDevice(), handle, null);
-		handle=-1;
+		vkDestroySwapchainKHR(gpu.getDevice(), handle.get(0), null);
+		
+		handle=null;
 	}
 	
 	public long getHandle(){
+		return handle.get(0);
+	}
+	
+	public LongBuffer getBuffer(){
 		return handle;
 	}
 	
@@ -177,5 +210,18 @@ public class VkSwapchain implements VkDestroyable{
 	
 	public long getFramebuffer(int i){
 		return framebuffers[i];
+	}
+	
+	@Override
+	public VkGpu getGpu(){
+		return gpu;
+	}
+	
+	public VkSemaphore getImageAviable(){
+		return imageAviable;
+	}
+	
+	public VkSemaphore getRenderFinish(){
+		return renderFinish;
 	}
 }

@@ -50,14 +50,14 @@ public class ApplicationVk{
 		Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "shutdown-thread"));
 		
 		setUpWindow();
-		
+		gameWindow.show();
+		gameWindow.monitor.set(GlfwMonitor.getMonitors().get(1));
 		NanoTimer timer=new NanoTimer();
 		
 		timer.start();
 		vkRenderer.createContext(gameWindow);
 		timer.end();
-		
-		gameWindow.show();
+		int a=1^1;
 		
 		LogUtil.println("Engine initialized in", timer.s(), "seconds");
 	}

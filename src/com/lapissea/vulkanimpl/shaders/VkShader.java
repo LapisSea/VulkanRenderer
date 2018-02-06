@@ -5,6 +5,7 @@ import com.lapissea.util.UtilL;
 import com.lapissea.util.filechange.FileChageDetector;
 import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
+import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import com.lapissea.vulkanimpl.util.VkShaderCompiler;
@@ -30,7 +31,6 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
@@ -77,7 +77,7 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 	}
 	
 	public VkShader init(ShaderState state, VkRenderPass renderPass){
-		if(DEVELOPMENT){
+		if(DevelopmentInfo.DEV_ON){
 			
 			BiConsumer<String, String> winComp=(fileName, type)->{
 				File target=new File("res/assets/shaders", fileName);

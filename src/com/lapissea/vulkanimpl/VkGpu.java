@@ -1,5 +1,6 @@
 package com.lapissea.vulkanimpl;
 
+import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import com.lapissea.vulkanimpl.util.types.VkCommandPool;
@@ -15,7 +16,6 @@ import java.nio.IntBuffer;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.lapissea.vulkanimpl.VulkanRenderer.Settings.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -24,15 +24,15 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	
 	public class Queue{
 		
-		private      VkQueue queue;
+		protected    VkQueue queue;
 		public final int     id;
 		
 		public Queue(int id){
 			this.id=id;
 		}
 		
-		private void init(){
-			if(DEVELOPMENT&&getDevice()==null) throw new IllegalStateException("Gpu not initialized");
+		protected void init(){
+			if(DevelopmentInfo.DEV_ON&&getDevice()==null) throw new IllegalStateException("Gpu not initialized");
 			try(MemoryStack stack=stackPush()){
 				queue=Vk.createDeviceQueue(getDevice(), id, 0, stack.callocPointer(1));
 			}
@@ -51,6 +51,29 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 				return Vk.createCommandPool(getGpu(), poolInfo, stack.mallocLong(1));
 			}
 		}
+		
+		public Queue submit(VkSubmitInfo submitInfo){
+			Vk.queueSubmit(queue, submitInfo, 0);
+			return this;
+		}
+		
+		public Queue waitIdle(){
+			Vk.queueWaitIdle(queue);
+			return this;
+		}
+		
+	}
+	
+	public class SurfaceQu extends Queue{
+		
+		public SurfaceQu(int id){
+			super(id);
+		}
+		
+		public SurfaceQu present(VkPresentInfoKHR presentInfo){
+			Vk.queuePresentKHR(queue, presentInfo);
+			return this;
+		}
 	}
 	
 	private final VulkanRenderer instance;
@@ -64,9 +87,9 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	private List<String>                     deviceExtensionProperties;
 	
 	private VkQueueFamilyProperties.Buffer queueFamilyProperties;
-	private VkGpu.Queue                    graphicsQueue;
-	private VkGpu.Queue                    surfaceQueue;
-	private VkGpu.Queue                    transferQueue;
+	private Queue                          graphicsQueue;
+	private SurfaceQu                      surfaceQueue;
+	private Queue                          transferQueue;
 	
 	
 	public VkGpu(VulkanRenderer instance, VkPhysicalDevice physicalDevice){
@@ -107,7 +130,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 					graphicsQueue=new Queue(i);
 				}
 				if(surfaceQueue==null&&Vk.getPhysicalDeviceSurfaceSupportKHR(this, i, ip)){
-					surfaceQueue=new Queue(i);
+					surfaceQueue=new SurfaceQu(i);
 				}
 				if(transferQueue==null&&(flags&VK_QUEUE_TRANSFER_BIT)!=0&&(flags&VK_QUEUE_GRAPHICS_BIT)==0){
 					transferQueue=new Queue(i);
@@ -222,7 +245,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		return graphicsQueue;
 	}
 	
-	public VkGpu.Queue getSurfaceQueue(){
+	public SurfaceQu getSurfaceQueue(){
 		return surfaceQueue;
 	}
 	
@@ -258,6 +281,10 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			info.sType(VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO);
 			return Vk.createSemaphore(this, info);
 		}
+	}
+	
+	public void waitFor(){
+		vkDeviceWaitIdle(getDevice());
 	}
 	
 }
