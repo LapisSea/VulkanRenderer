@@ -13,9 +13,10 @@ import org.lwjgl.vulkan.*;
 
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
-import java.util.stream.Stream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
-import static com.lapissea.util.UtilL.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.KHRSurface.*;
@@ -24,16 +25,30 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	
-	public class Image{
-		private int         index;
-		private long        framebuffer;
-		private VkTexture   colorFrame;
-		private VkSemaphore imageAviable;
+	public class Frame{
+		private      long        frameBuffer;
+		private      VkTexture   colorFrame;
+		private      VkSemaphore renderFinish;
+		public final int         index;
 		
-		public Image(int index, VkTexture colorFrame, VkSemaphore imageAviable){
+		public Frame(int index, VkTexture colorFrame, VkSemaphore renderFinish){
 			this.index=index;
 			this.colorFrame=colorFrame;
-			this.imageAviable=imageAviable;
+			this.renderFinish=renderFinish;
+		}
+		
+		public void destroy(){
+			vkDestroyFramebuffer(getDevice(), frameBuffer, null);
+			colorFrame.destroy();
+			renderFinish.destroy();
+		}
+		
+		public VkSemaphore getRenderFinish(){
+			return renderFinish;
+		}
+		
+		public long getFrameBuffer(){
+			return frameBuffer;
 		}
 	}
 	
@@ -42,8 +57,8 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	private       int         format;
 	private       int         colorSpace;
 	private final VkSurface   surface;
-	private       VkSemaphore renderFinish;
-	private       Image[]     images;
+	private       VkSemaphore imageAviable;
+	private       List<Frame> frames;
 	
 	private IntBuffer acquireNextImageMem=memAllocInt(1);
 	
@@ -55,7 +70,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		try(MemoryStack stack=stackPush()){
 			create(gpu, surface, stack);
 		}
-		renderFinish=gpu.createSemaphore();
+		imageAviable=gpu.createSemaphore();
 	}
 	
 	private void create(VkGpu gpu, VkSurface surface, MemoryStack stack){
@@ -112,10 +127,11 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		
 		VkTexture[] colors=UtilL.convert(Vk.getSwapchainImagesKHR(gpu, this, stack), VkTexture[]::new,
 		                                 image->new VkTexture(image).createView(format.format(), VkImageAspect.COLOR));
-		images=new Image[colors.length];
+		List<Frame> frames0=new ArrayList<>(colors.length);
 		for(int i=0;i<colors.length;i++){
-			images[i]
+			frames0.add(new Frame(i, colors[i], gpu.createSemaphore()));
 		}
+		frames=Collections.unmodifiableList(frames0);
 	}
 	
 	
@@ -130,9 +146,9 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 			               .layers(1);
 			
 			LongBuffer lb=stack.mallocLong(1), view=stack.mallocLong(1);
-			framebuffers=Stream.of(colorFrames)
-			                   .mapToLong(c->Vk.createFrameBuffer(gpu, framebufferInfo.pAttachments(view.put(0, c.getView())), lb))
-			                   .toArray();
+			for(Frame frame : frames){
+				frame.frameBuffer=Vk.createFrameBuffer(gpu, framebufferInfo.pAttachments(view.put(0, frame.colorFrame.getView())), lb);
+			}
 			
 		}
 	}
@@ -165,14 +181,14 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		for(int i=0;i<availablePresentModes.capacity();i++) ids[i]=availablePresentModes.get(i);
 		VulkanRenderer.Settings settings=gpu.getInstance().getSettings();
 		
-		if(settings.enableTrippleBuffering.get()&&UtilL.contains(ids, VK_PRESENT_MODE_MAILBOX_KHR)) return VK_PRESENT_MODE_MAILBOX_KHR;
-		if(settings.enableVsync.get()&&UtilL.contains(ids, VK_PRESENT_MODE_FIFO_KHR)) return VK_PRESENT_MODE_FIFO_KHR;
+		if(settings.trippleBufferingEnabled.get()&&UtilL.contains(ids, VK_PRESENT_MODE_MAILBOX_KHR)) return VK_PRESENT_MODE_MAILBOX_KHR;
+		if(settings.vSyncEnabled.get()&&UtilL.contains(ids, VK_PRESENT_MODE_FIFO_KHR)) return VK_PRESENT_MODE_FIFO_KHR;
 		return VK_PRESENT_MODE_IMMEDIATE_KHR;
 	}
 	
-	public IntBuffer acquireNextImage(){
-		Vk.acquireNextImageKHR(getDevice(), this, imageAviable.getHandle(), VK_NULL_HANDLE, acquireNextImageMem);
-		return acquireNextImageMem;
+	public Frame acquireNextFrame(){
+		int id=Vk.acquireNextImageKHR(getDevice(), this, imageAviable.getHandle(), VK_NULL_HANDLE, acquireNextImageMem);
+		return id==-1?null:frames.get(id);
 	}
 	
 	@Override
@@ -181,12 +197,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		
 		memFree(acquireNextImageMem);
 		imageAviable.destroy();
-		renderFinish.destroy();
-		
-		for(long framebuffer : framebuffers){
-			vkDestroyFramebuffer(gpu.getDevice(), framebuffer, null);
-		}
-		forEach(colorFrames, VkTexture::destroy);
+		frames.forEach(Frame::destroy);
 		vkDestroySwapchainKHR(gpu.getDevice(), handle.get(0), null);
 		
 		handle=null;
@@ -204,12 +215,9 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		return format;
 	}
 	
-	public int getFramebufferCount(){
-		return framebuffers.length;
-	}
 	
-	public long getFramebuffer(int i){
-		return framebuffers[i];
+	public List<Frame> getFrames(){
+		return frames;
 	}
 	
 	@Override
@@ -219,9 +227,5 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	
 	public VkSemaphore getImageAviable(){
 		return imageAviable;
-	}
-	
-	public VkSemaphore getRenderFinish(){
-		return renderFinish;
 	}
 }

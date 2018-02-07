@@ -1,11 +1,13 @@
 package com.lapissea.vulkanimpl;
 
 import com.lapissea.datamanager.DataManager;
+import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwMonitor;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NanoTimer;
 import com.lapissea.util.UtilL;
+import com.lapissea.vulkanimpl.util.FpsCounter;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -19,6 +21,8 @@ import java.net.URISyntaxException;
 import java.util.Objects;
 import java.util.stream.IntStream;
 
+import static org.lwjgl.glfw.GLFW.*;
+
 public class ApplicationVk{
 	
 	private static final boolean TO_JAR=true;
@@ -29,6 +33,9 @@ public class ApplicationVk{
 	
 	private DataManager manger;
 	
+	private FpsCounter fps=new FpsCounter(true);
+	private long lastFpsPrint;
+	
 	public ApplicationVk(){
 		init();
 		while(run()) ;
@@ -36,6 +43,7 @@ public class ApplicationVk{
 	}
 	
 	public void init(){
+		fps.activate();
 		
 		manger=new DataManager();
 		try{
@@ -44,20 +52,27 @@ public class ApplicationVk{
 		}catch(URISyntaxException e){}
 		
 		vkRenderer=new VulkanRenderer(manger);
-		
+		vkRenderer.getSettings().trippleBufferingEnabled.set(false);
 		GlfwMonitor.init();
 		
 		Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "shutdown-thread"));
 		
 		setUpWindow();
-		gameWindow.show();
-		gameWindow.monitor.set(GlfwMonitor.getMonitors().get(1));
-		NanoTimer timer=new NanoTimer();
 		
+		NanoTimer timer=new NanoTimer();
 		timer.start();
 		vkRenderer.createContext(gameWindow);
 		timer.end();
-		int a=1^1;
+		
+		gameWindow.registryKeyboardKey.register(event->{
+			if(event.type!=GlfwKeyboardEvent.Type.DOWN) return;
+			if(event.key==GLFW_KEY_F11){
+				if(gameWindow.monitor.get()!=null) gameWindow.monitor.set(null);
+				else gameWindow.setAutoFullScreen();
+			}
+		});
+		
+		gameWindow.show();
 		
 		LogUtil.println("Engine initialized in", timer.s(), "seconds");
 	}
@@ -98,13 +113,25 @@ public class ApplicationVk{
 	public boolean run(){
 		gameWindow.pollEvents();
 		if(gameWindow.shouldClose()) return false;
-		
-		vkRenderer.render();
-		
-		UtilL.sleep(1);
+		render();
 		return true;
 	}
 	
+	private void render(){
+		if(gameWindow.isHidden()){
+			UtilL.sleep(1);
+			return;
+		}
+		
+		vkRenderer.render();
+		fps.newFrame();
+		
+		long tim=System.currentTimeMillis();
+		if(lastFpsPrint+1000<tim){
+			lastFpsPrint=tim;
+			LogUtil.println(fps);
+		}
+	}
 	
 	public void destroy(){
 		gameWindow.saveState(winSaveFile);

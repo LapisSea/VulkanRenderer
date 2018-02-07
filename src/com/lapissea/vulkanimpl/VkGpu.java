@@ -70,9 +70,8 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			super(id);
 		}
 		
-		public SurfaceQu present(VkPresentInfoKHR presentInfo){
-			Vk.queuePresentKHR(queue, presentInfo);
-			return this;
+		public boolean present(VkPresentInfoKHR presentInfo){
+			return Vk.queuePresentKHR(queue, presentInfo);
 		}
 	}
 	
@@ -283,7 +282,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		}
 	}
 	
-	public void waitFor(){
+	public void waitIdle(){
 		vkDeviceWaitIdle(getDevice());
 	}
 	

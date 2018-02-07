@@ -2,7 +2,6 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.datamanager.IDataManager;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
 import com.lapissea.util.event.change.ChangeRegistryBool;
 import com.lapissea.vec.color.ColorM;
 import com.lapissea.vec.interf.IVec2iR;
@@ -20,7 +19,6 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
-import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,6 +27,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.lapissea.util.UtilL.*;
 import static com.lapissea.vulkanimpl.devonly.VkDebugReport.Type.*;
 import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
@@ -41,8 +40,8 @@ public class VulkanRenderer implements VkDestroyable{
 	
 	public static class Settings{
 		
-		public ChangeRegistryBool enableVsync           =new ChangeRegistryBool(true);
-		public ChangeRegistryBool enableTrippleBuffering=new ChangeRegistryBool(true);
+		public ChangeRegistryBool vSyncEnabled           =new ChangeRegistryBool(true);
+		public ChangeRegistryBool trippleBufferingEnabled=new ChangeRegistryBool(true);
 	}
 	
 	public static final String ENGINE_NAME   ="JLapisor";
@@ -68,6 +67,8 @@ public class VulkanRenderer implements VkDestroyable{
 	
 	private VkCommandPool      graphicsPool;
 	private VkCommandBufferM[] sceneCommandBuffers;
+	
+	private boolean surfaceBad;
 	
 	public VulkanRenderer(IDataManager assets){
 		this.assets=assets;
@@ -98,26 +99,26 @@ public class VulkanRenderer implements VkDestroyable{
 		
 		surface=window.createSurface(this);
 		intGpus();
+		initSurfaceDependant();
+	}
+	
+	private void initSurfaceDependant(){
 		swapchain=new VkSwapchain(renderGpu, surface);
-		
-		
-		initRenderPass();
-		initGraphicsPipeline();
+		renderPass=createRenderPass();
+		shader=createGraphicsPipeline();
 		graphicsPool=renderGpu.getGraphicsQueue().createCommandPool();
-		
 		swapchain.initFrameBuffers(renderPass);
 		initScene();
 	}
 	
 	private void initScene(){
 		
-		sceneCommandBuffers=graphicsPool.allocateCommandBuffers(swapchain.getFramebufferCount());
-		
-		for(int i=0;i<swapchain.getFramebufferCount();i++){
-			VkCommandBufferM sceneBuffer=sceneCommandBuffers[i];
+		sceneCommandBuffers=graphicsPool.allocateCommandBuffers(swapchain.getFrames().size());
+		for(VkSwapchain.Frame frame : swapchain.getFrames()){
+			VkCommandBufferM sceneBuffer=sceneCommandBuffers[frame.index];
 			
 			sceneBuffer.begin();
-			renderPass.begin(sceneBuffer, swapchain.getFramebuffer(i), surface.getSize(), new ColorM(0, 0, 0, 0));
+			renderPass.begin(sceneBuffer, frame.getFrameBuffer(), surface.getSize(), new ColorM(0, 0, 0, 0));
 			
 			shader.bind(sceneBuffer);
 			sceneBuffer.render(3);
@@ -127,7 +128,7 @@ public class VulkanRenderer implements VkDestroyable{
 		}
 	}
 	
-	private void initRenderPass(){
+	private VkRenderPass createRenderPass(){
 		
 		try(MemoryStack stack=stackPush()){
 			
@@ -167,8 +168,7 @@ public class VulkanRenderer implements VkDestroyable{
 			              .pAttachments(attachments)
 			              .pSubpasses(subpasses)
 			              .pDependencies(dependency);
-			renderPass=Vk.createRenderPass(renderGpu, renderPassInfo, stack.mallocLong(1));
-			
+			return Vk.createRenderPass(renderGpu, renderPassInfo, stack.mallocLong(1));
 		}
 		
 	}
@@ -259,29 +259,64 @@ public class VulkanRenderer implements VkDestroyable{
 		}
 	}
 	
-	private void initGraphicsPipeline(){
-		
-		shader=new VkShader(assets.subData("assets/shaders"), "test", getRenderGpu(), surface);
-		ShaderState state=new ShaderState();
+	private VkShader createGraphicsPipeline(){
+		VkShader    shader=new VkShader(assets.subData("assets/shaders"), "test", getRenderGpu(), surface);
+		ShaderState state =new ShaderState();
 		state.setViewport(window.size);
 		shader.init(state, renderPass);
 		
+		return shader;
 	}
 	
 	private void onWindowResize(IVec2iR size){
-//		LogUtil.println(size);
+		surfaceBad=true;
+	}
+	
+	private void recreateSurface(){
+		renderGpu.waitIdle();
+		surfaceBad=false;
+		destroySurfaceDependant();
+		initSurfaceDependant();
+	}
+	
+	private void destroySurfaceDependant(){
+		forEach(sceneCommandBuffers, VkCommandBufferM::destroy);
+		shader.destroy();
+		graphicsPool.destroy();
+		renderPass.destroy();
+		swapchain.destroy();
+	}
+	
+	@Override
+	public void destroy(){
+		renderGpu.waitIdle();
+		
+		destroySurfaceDependant();
+		
+		surface.destroy();
+		
+		if(DEV_ON){
+			debugReport.destroy();
+		}
+		vkDestroyInstance(instance, null);
 	}
 	
 	public void render(){
-//		if(UtilL.TRUE())return;
+		if(window.isHidden()) return;
+		
+		if(surfaceBad) recreateSurface();
+		
 		try(MemoryStack stack=stackPush()){
 			
 			
-			renderGpu.getSurfaceQueue().waitIdle();
-			IntBuffer imageIndex=swapchain.acquireNextImage();
+			VkSwapchain.Frame frame=swapchain.acquireNextFrame();
+			if(frame==null){
+				recreateSurface();
+				frame=swapchain.acquireNextFrame();
+			}
 			
 			LongBuffer imgAviable  =swapchain.getImageAviable().getBuffer();
-			LongBuffer renderFinish=swapchain.getRenderFinish().getBuffer();
+			LongBuffer renderFinish=frame.getRenderFinish().getBuffer();
 			LongBuffer swapchains  =swapchain.getBuffer();
 			
 			VkSubmitInfo mainRenderSubmitInfo=VkSubmitInfo.callocStack(stack);
@@ -300,9 +335,11 @@ public class VulkanRenderer implements VkDestroyable{
 			           .pWaitSemaphores(renderFinish)
 			           .pSwapchains(swapchains)
 			           .swapchainCount(swapchains.limit())
-			           .pImageIndices(imageIndex);
+			           .pImageIndices(stack.ints(frame.index));
 			
-			renderGpu.getSurfaceQueue().present(presentInfo);
+			if(renderGpu.getSurfaceQueue().present(presentInfo)){
+				surfaceBad=true;
+			}
 			
 		}
 	}
@@ -329,20 +366,5 @@ public class VulkanRenderer implements VkDestroyable{
 		return surface;
 	}
 	
-	@Override
-	public void destroy(){
-		renderGpu.waitFor();
-		
-		renderPass.destroy();
-		shader.destroy();
-		
-		swapchain.destroy();
-		surface.destroy();
-		
-		if(DEV_ON){
-			debugReport.destroy();
-		}
-		vkDestroyInstance(instance, null);
-	}
 	
 }

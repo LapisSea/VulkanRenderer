@@ -2,6 +2,7 @@ package com.lapissea.vulkanimpl.util.types;
 
 import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
+import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkCommandBuffer;
@@ -11,7 +12,7 @@ import org.lwjgl.vulkan.VkCommandBufferInheritanceInfo;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
-public class VkCommandBufferM extends VkCommandBuffer implements VkGpuCtx{
+public class VkCommandBufferM extends VkCommandBuffer implements VkGpuCtx, VkDestroyable{
 	
 	private final VkCommandPool pool;
 	public final  boolean       isPrimary;
@@ -58,5 +59,10 @@ public class VkCommandBufferM extends VkCommandBuffer implements VkGpuCtx{
 	
 	public void end(){
 		Vk.endCommandBuffer(this);
+	}
+	
+	@Override
+	public void destroy(){
+		vkFreeCommandBuffers(getDevice(), pool.getHandle(), this);
 	}
 }

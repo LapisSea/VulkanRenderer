@@ -403,10 +403,16 @@ public class Vk{
 		if(DEV_ON) check(code);
 	}
 	
-	public static void queuePresentKHR(VkQueue queue, VkPresentInfoKHR presentInfo){
+	public static boolean queuePresentKHR(VkQueue queue, VkPresentInfoKHR presentInfo){
 		int code=vkQueuePresentKHR(queue, presentInfo);
-		if(DEV_ON) check(code);
+		if(DEV_ON){
+			if(code==VK_SUBOPTIMAL_KHR) return true;
+			check(code);
+			return false;
+		}
+		return code==VK_SUBOPTIMAL_KHR;
 	}
+	
 	public static void queueWaitIdle(VkQueue queue){
 		int code=vkQueueWaitIdle(queue);
 		if(DEV_ON) check(code);
