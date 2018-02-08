@@ -7,7 +7,10 @@ import com.lapissea.vec.color.ColorM;
 import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.devonly.ValidationLayers;
 import com.lapissea.vulkanimpl.devonly.VkDebugReport;
+import com.lapissea.vulkanimpl.renderer.model.VkModelBuilder;
+import com.lapissea.vulkanimpl.renderer.model.VkModelFormat;
 import com.lapissea.vulkanimpl.shaders.ShaderState;
+import com.lapissea.vulkanimpl.shaders.VkPipelineInput;
 import com.lapissea.vulkanimpl.shaders.VkShader;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
@@ -99,13 +102,30 @@ public class VulkanRenderer implements VkDestroyable{
 		
 		surface=window.createSurface(this);
 		intGpus();
+		initModel();
 		initSurfaceDependant();
 	}
 	
+	private void initModel(){
+		VkModelFormat  format      =new VkModelFormat(VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32B32_SFLOAT);
+		
+		VkModelBuilder modelBuilder=new VkModelBuilder(format);
+		modelBuilder.putF(0, 0).putF(0, 0, 0);
+		
+		try(MemoryStack stack=stackPush()){
+			VkBufferCreateInfo bufferInfo=VkBufferCreateInfo.callocStack(stack);
+			bufferInfo.sType(VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO)
+			          .size();
+		}
+	}
+	
 	private void initSurfaceDependant(){
+		
+		VkModelFormat format=new VkModelFormat(VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R8G8B8_UNORM);
+		
 		swapchain=new VkSwapchain(renderGpu, surface);
 		renderPass=createRenderPass();
-		shader=createGraphicsPipeline();
+		shader=createGraphicsPipeline(format);
 		graphicsPool=renderGpu.getGraphicsQueue().createCommandPool();
 		swapchain.initFrameBuffers(renderPass);
 		initScene();
@@ -259,10 +279,11 @@ public class VulkanRenderer implements VkDestroyable{
 		}
 	}
 	
-	private VkShader createGraphicsPipeline(){
+	private VkShader createGraphicsPipeline(VkModelFormat format){
 		VkShader    shader=new VkShader(assets.subData("assets/shaders"), "test", getRenderGpu(), surface);
 		ShaderState state =new ShaderState();
 		state.setViewport(window.size);
+		state.setInput(new VkPipelineInput(format));
 		shader.init(state, renderPass);
 		
 		return shader;
@@ -307,7 +328,6 @@ public class VulkanRenderer implements VkDestroyable{
 		if(surfaceBad) recreateSurface();
 		
 		try(MemoryStack stack=stackPush()){
-			
 			
 			VkSwapchain.Frame frame=swapchain.acquireNextFrame();
 			if(frame==null){

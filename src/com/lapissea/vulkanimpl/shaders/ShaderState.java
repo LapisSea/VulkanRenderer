@@ -2,11 +2,13 @@ package com.lapissea.vulkanimpl.shaders;
 
 import com.lapissea.vec.Vec2i;
 import com.lapissea.vec.interf.IVec2iR;
+import com.lapissea.vulkanimpl.renderer.model.VkModelFormat;
 import com.lapissea.vulkanimpl.shaders.states.VkBlendMode;
 import com.lapissea.vulkanimpl.shaders.states.VkDrawMode;
-import com.lapissea.vulkanimpl.util.DevelopmentInfo;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
+import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -22,15 +24,16 @@ public class ShaderState{
 		VK_SAMPLE_COUNT_64_BIT
 	};
 	
-	private       boolean     blending       =false;
-	private       boolean     supersampling  =false;
-	private       int         sampleLevel    =0;
-	private       VkDrawMode  drawMode       =VkDrawMode.TRIANGLES;
-	private       VkBlendMode blendMode      =VkBlendMode.NO_BLEND;
-	private       int[]       dynamicStates  ={};
-	private       boolean     scissorsEnabled=false;
-	private final int[]       scissors       ={0, 0, 0, 0};
-	private final Vec2i       viewport       =new Vec2i();
+	private       boolean         blending       =false;
+	private       boolean         supersampling  =false;
+	private       int             sampleLevel    =0;
+	private       VkDrawMode      drawMode       =VkDrawMode.TRIANGLES;
+	private       VkBlendMode     blendMode      =VkBlendMode.NO_BLEND;
+	private       int[]           dynamicStates  ={};
+	private       boolean         scissorsEnabled=false;
+	private final int[]           scissors       ={0, 0, 0, 0};
+	private final Vec2i           viewport       =new Vec2i();
+	private       VkPipelineInput input          =new VkPipelineInput(new VkModelFormat());
 	
 	public ShaderState setBlending(boolean blending){
 		this.blending=blending;
@@ -40,6 +43,10 @@ public class ShaderState{
 	public ShaderState setSampleLevel(int sampleLevel){
 		this.sampleLevel=sampleLevel;
 		return this;
+	}
+	
+	public void setInput(VkPipelineInput input){
+		this.input=input;
 	}
 	
 	public void setSupersampling(boolean supersampling){
@@ -70,14 +77,14 @@ public class ShaderState{
 	}
 	
 	
-	public void write(VkGraphicsPipelineCreateInfo pipelineInfo){
+	public void write(MemoryStack stack, VkGraphicsPipelineCreateInfo pipelineInfo){
 		
-		if(DevelopmentInfo.DEV_ON){
+		if(DEV_ON){
 			if(sampleLevel<0) throw new IllegalArgumentException("Sample power of 2 can not be negative!");
 			if(sampleLevel>=SAMPLE_LEVELS.length) throw new IllegalArgumentException((1<<sampleLevel)+" samples per pixel is to much!");
 		}
 		
-		VkPipelineMultisampleStateCreateInfo multisampling=VkPipelineMultisampleStateCreateInfo.callocStack();
+		VkPipelineMultisampleStateCreateInfo multisampling=VkPipelineMultisampleStateCreateInfo.callocStack(stack);
 		multisampling.sType(VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO)
 		             .sampleShadingEnable(supersampling)
 		             .rasterizationSamples(SAMPLE_LEVELS[sampleLevel])//samples per pixel
@@ -87,9 +94,9 @@ public class ShaderState{
 		             .alphaToOneEnable(false);
 		
 		
-		VkPipelineColorBlendAttachmentState.Buffer colorBlending=blendMode.write(VkPipelineColorBlendAttachmentState.callocStack(1));
+		VkPipelineColorBlendAttachmentState.Buffer colorBlending=blendMode.write(VkPipelineColorBlendAttachmentState.callocStack(1, stack));
 		
-		VkPipelineColorBlendStateCreateInfo colorBlendingState=VkPipelineColorBlendStateCreateInfo.callocStack();
+		VkPipelineColorBlendStateCreateInfo colorBlendingState=VkPipelineColorBlendStateCreateInfo.callocStack(stack);
 		colorBlendingState.sType(VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO)
 		                  .logicOpEnable(blending)
 		                  .logicOp(VK_LOGIC_OP_COPY)
@@ -100,7 +107,7 @@ public class ShaderState{
 		                  .blendConstants(3, 0);
 		
 		
-		VkPipelineRasterizationStateCreateInfo rasterizer=VkPipelineRasterizationStateCreateInfo.callocStack();
+		VkPipelineRasterizationStateCreateInfo rasterizer=VkPipelineRasterizationStateCreateInfo.callocStack(stack);
 		rasterizer.sType(VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO)
 		          .depthClampEnable(false)//clamp pixels outside depth range instead of discarding them
 		          .rasterizerDiscardEnable(false) //disable output to frame buffer
@@ -115,21 +122,21 @@ public class ShaderState{
 		
 		VkPipelineDynamicStateCreateInfo dynamicStates=null;
 		if(this.dynamicStates.length>0){
-			dynamicStates=VkPipelineDynamicStateCreateInfo.callocStack();
+			dynamicStates=VkPipelineDynamicStateCreateInfo.callocStack(stack);
 			dynamicStates.sType(VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO)
 			             .pDynamicStates(stackGet().ints(this.dynamicStates));
 		}
 		
 		
-		VkPipelineInputAssemblyStateCreateInfo inputAssembly=VkPipelineInputAssemblyStateCreateInfo.callocStack();
+		VkPipelineInputAssemblyStateCreateInfo inputAssembly=VkPipelineInputAssemblyStateCreateInfo.callocStack(stack);
 		inputAssembly.sType(VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO)
 		             .topology(drawMode.handle)
 		             .primitiveRestartEnable(false);
 		
-		VkViewport.Buffer viewports=VkViewport.callocStack(1);
+		VkViewport.Buffer viewports=VkViewport.callocStack(1, stack);
 		viewports.get(0).set(0, 0, viewport.x(), viewport.y(), 0, 1);
 		
-		VkRect2D.Buffer scissors=VkRect2D.callocStack(1);
+		VkRect2D.Buffer scissors=VkRect2D.callocStack(1, stack);
 		
 		VkRect2D sc=scissors.get(0);
 		if(scissorsEnabled){
@@ -140,12 +147,18 @@ public class ShaderState{
 			sc.extent().set(viewport.x(), viewport.y());
 		}
 		
-		VkPipelineViewportStateCreateInfo viewport=VkPipelineViewportStateCreateInfo.callocStack();
+		VkPipelineViewportStateCreateInfo viewport=VkPipelineViewportStateCreateInfo.callocStack(stack);
 		viewport.sType(VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO)
 		        .viewportCount(viewports.limit())
 		        .pViewports(viewports)
 		        .scissorCount(scissors.limit())
 		        .pScissors(scissors);
+		
+		
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo=VkPipelineVertexInputStateCreateInfo.callocStack(stack);
+		vertexInputInfo.sType(VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO)
+		               .pVertexBindingDescriptions(input.format.getBindings(stack))
+		               .pVertexAttributeDescriptions(input.format.getAttributes(stack));
 		
 		pipelineInfo.pInputAssemblyState(inputAssembly)
 		            .pViewportState(viewport)
@@ -153,6 +166,7 @@ public class ShaderState{
 		            .pMultisampleState(multisampling)
 		            .pDepthStencilState(null)
 		            .pColorBlendState(colorBlendingState)
+		            .pVertexInputState(vertexInputInfo)
 		            .pDynamicState(dynamicStates);
 	}
 	

@@ -21,6 +21,7 @@ import java.net.URISyntaxException;
 import java.util.Objects;
 import java.util.stream.IntStream;
 
+import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
 import static org.lwjgl.glfw.GLFW.*;
 
 public class ApplicationVk{
@@ -46,13 +47,19 @@ public class ApplicationVk{
 		fps.activate();
 		
 		manger=new DataManager();
-		try{
-			File root=new File(ApplicationVk.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
-			manger.registerDomain(root);
-		}catch(URISyntaxException e){}
+		if(DEV_ON){
+			manger.registerDomain(new File("res"));
+		}else{
+			try{
+				File root=new File(ApplicationVk.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
+				manger.registerDomain(root);
+			}catch(URISyntaxException e){
+				UtilL.uncheckedThrow(e);
+			}
+		}
 		
 		vkRenderer=new VulkanRenderer(manger);
-		vkRenderer.getSettings().trippleBufferingEnabled.set(false);
+//		vkRenderer.getSettings().trippleBufferingEnabled.set(false);
 		GlfwMonitor.init();
 		
 		Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "shutdown-thread"));
@@ -66,14 +73,20 @@ public class ApplicationVk{
 		
 		gameWindow.registryKeyboardKey.register(event->{
 			if(event.type!=GlfwKeyboardEvent.Type.DOWN) return;
-			if(event.key==GLFW_KEY_F11){
+			switch(event.key){
+			case GLFW_KEY_F11:{
 				if(gameWindow.monitor.get()!=null) gameWindow.monitor.set(null);
 				else gameWindow.setAutoFullScreen();
+				break;
+			}
+			case GLFW_KEY_ESCAPE:{
+				gameWindow.requestClose();
+				break;
+			}
 			}
 		});
 		
 		gameWindow.show();
-		
 		LogUtil.println("Engine initialized in", timer.s(), "seconds");
 	}
 	

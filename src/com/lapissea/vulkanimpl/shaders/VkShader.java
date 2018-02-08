@@ -110,21 +110,15 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 				stages.get(i).write(shaderStages.get(i));
 			}
 			
-			VkPipelineVertexInputStateCreateInfo vertexInputInfo=VkPipelineVertexInputStateCreateInfo.callocStack(stack);
-			vertexInputInfo.sType(VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO)
-			               .pVertexBindingDescriptions(null)
-			               .pVertexAttributeDescriptions(null);
-			
 			VkGraphicsPipelineCreateInfo.Buffer pipelineInfo=VkGraphicsPipelineCreateInfo.callocStack(1, stack);
 			pipelineInfo.get(0)
 			            .sType(VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO)
 			            .pStages(shaderStages)
-			            .pVertexInputState(vertexInputInfo)
 			            .layout(pipelineLayout)
 			            .renderPass(renderPass.getHandle())
 			            .basePipelineHandle(VK_NULL_HANDLE)
 			            .basePipelineIndex(-1);
-			state.write(pipelineInfo.get(0));
+			state.write(stack,pipelineInfo.get(0));
 			
 			
 			pipeline=Vk.createGraphicsPipelines(gpu, 0, pipelineInfo, stack.mallocLong(1));

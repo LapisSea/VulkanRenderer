@@ -1,81 +1,59 @@
 package com.lapissea.vulkanimpl.renderer.model;
 
+import com.lapissea.vulkanimpl.util.VkFormatInfo;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.VkVertexInputAttributeDescription;
+import org.lwjgl.vulkan.VkVertexInputBindingDescription;
+
+import static com.lapissea.util.UtilL.*;
+import static org.lwjgl.vulkan.VK10.*;
+
 public class VkModelFormat{
 	
-	private final Class[] parts;
-	private final int     sizeBits;
-	private final int[]   offsets;
-	private final int     hashCode;
+	private final int            size;
+	private final int            offsets[];
+	private final VkFormatInfo[] formats;
 	
-	private final BufferBuilder[] attributes;
+	public VkModelFormat(int... formats){
+		this(convert(formats, VkFormatInfo[]::new, VkFormatInfo::get));
+	}
 	
-	public VkModelFormat(Class... parts){
-		this.parts=parts.clone();
-		offsets=new int[parts.length];
-		attributes=new BufferBuilder[parts.length];
+	public VkModelFormat(VkFormatInfo... formats){
+		this.formats=formats;
+		int siz=0;
+		offsets=new int[formats.length];
+		for(int i=0;i<formats.length;i++){
+			offsets[i]=siz;
+			siz+=formats[i].totalByteSize;
+		}
+		size=siz;
+	}
+	
+	public VkVertexInputBindingDescription.Buffer getBindings(MemoryStack stack){
+		VkVertexInputBindingDescription.Buffer input=VkVertexInputBindingDescription.callocStack(1, stack);
+		input.get(0)
+		     .binding(0)
+		     .stride(size)
+		     .inputRate(VK_VERTEX_INPUT_RATE_VERTEX);
 		
-		int hash=0;
-		int size=0;
-		for(int i=0;i<parts.length;i++){
-			
-			attributes[i]=BufferBuilder.find(getPart(i), i);
-			
-			offsets[i]=size;
-			size+=attributes[i].getSizeBits();
-			
-			int space=size/Byte.SIZE;
-			hash<<=space;
-			int ones=0;
-			for(int j=0;j<space*Byte.SIZE;j++){
-				ones+=Math.pow(1, j);
-			}
-			hash+=parts[i].hashCode()&ones;
+		return input;
+	}
+	
+	public VkVertexInputAttributeDescription.Buffer getAttributes(MemoryStack stack){
+		VkVertexInputAttributeDescription.Buffer input=VkVertexInputAttributeDescription.callocStack(offsets.length, stack);
+		
+		for(int i=0;i<offsets.length;i++){
+			input.get(i)
+			     .binding(0)//watch out!
+			     .location(i)
+			     .format(formats[i])
+			     .offset(offsets[i]);
 		}
 		
-		sizeBits=size;
-		hashCode=hash;
+		return input;
 	}
 	
-	public Class getPart(int i){
-		return parts[i];
-	}
-	
-	public int getOffset(int i){
-		return offsets[i];
-	}
-	
-	/**
-	 * get sizeBits of vertex in bits
-	 *
-	 * @return
-	 */
-	public int getSizeBits(){
-		return sizeBits;
-	}
-	
-	public int getSizeBytes(){
-		return getSizeBits()/Byte.SIZE;
-	}
-	
-	public int partCount(){
-		return parts.length;
-	}
-	
-	public int getFormat(int i){
-		return attributes[i].getFormat();
-	}
-	
-	public BufferBuilder getAttribute(int i){
-		return attributes[i];
-	}
-	
-	@Override
-	public int hashCode(){
-		return hashCode;
-	}
-	
-	@Override
-	public boolean equals(Object obj){
-		return obj instanceof VkModelFormat&&obj.hashCode()==hashCode();
+	public int getSize(){
+		return size;
 	}
 }
