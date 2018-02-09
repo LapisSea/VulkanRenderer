@@ -33,7 +33,7 @@ public class ShaderState{
 	private       boolean         scissorsEnabled=false;
 	private final int[]           scissors       ={0, 0, 0, 0};
 	private final Vec2i           viewport       =new Vec2i();
-	private       VkPipelineInput input          =new VkPipelineInput(new VkModelFormat());
+	private       VkPipelineInput input          =new VkPipelineInput(new VkModelFormat(0));
 	
 	public ShaderState setBlending(boolean blending){
 		this.blending=blending;

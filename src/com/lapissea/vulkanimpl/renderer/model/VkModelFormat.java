@@ -12,19 +12,19 @@ public class VkModelFormat{
 	
 	private final int            size;
 	private final int            offsets[];
-	private final VkFormatInfo[] formats;
+	private final VkFormatInfo[] types;
 	
-	public VkModelFormat(int... formats){
-		this(convert(formats, VkFormatInfo[]::new, VkFormatInfo::get));
+	public VkModelFormat(int... types){
+		this(convert(types, VkFormatInfo[]::new, VkFormatInfo::get));
 	}
 	
-	public VkModelFormat(VkFormatInfo... formats){
-		this.formats=formats;
+	public VkModelFormat(VkFormatInfo... types){
+		this.types=types;
 		int siz=0;
-		offsets=new int[formats.length];
-		for(int i=0;i<formats.length;i++){
+		offsets=new int[types.length];
+		for(int i=0;i<types.length;i++){
 			offsets[i]=siz;
-			siz+=formats[i].totalByteSize;
+			siz+=types[i].totalByteSize;
 		}
 		size=siz;
 	}
@@ -46,7 +46,7 @@ public class VkModelFormat{
 			input.get(i)
 			     .binding(0)//watch out!
 			     .location(i)
-			     .format(formats[i])
+			     .format(types[i].handle)
 			     .offset(offsets[i]);
 		}
 		
@@ -56,4 +56,13 @@ public class VkModelFormat{
 	public int getSize(){
 		return size;
 	}
+	
+	public VkFormatInfo getType(int i){
+		return types[i];
+	}
+	
+	public int getTypeCount(){
+		return types.length;
+	}
+	
 }

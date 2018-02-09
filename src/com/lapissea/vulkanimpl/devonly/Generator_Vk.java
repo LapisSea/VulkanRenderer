@@ -2,7 +2,7 @@ package com.lapissea.vulkanimpl.devonly;
 
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.UnsafeConsumer;
+import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.util.DevelopmentInfo;

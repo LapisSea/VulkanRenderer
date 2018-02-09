@@ -418,6 +418,12 @@ public class Vk{
 		if(DEV_ON) check(code);
 	}
 	
+	public static VkBuffer createBuffer(VkGpuCtx gpuCtx, VkBufferCreateInfo bufferInfo){
+		LongBuffer dest=memAllocLong(1);
+		int        code=vkCreateBuffer(gpuCtx.getDevice(), bufferInfo, null, dest);
+		if(DEV_ON) check(code);
+		return new VkBuffer(gpuCtx, dest, bufferInfo.size());
+	}
 	/*/START_GEN/*/
 	//lel
 	

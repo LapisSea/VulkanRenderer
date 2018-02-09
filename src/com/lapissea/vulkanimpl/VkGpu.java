@@ -3,6 +3,7 @@ package com.lapissea.vulkanimpl;
 import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
+import com.lapissea.vulkanimpl.util.types.VkBuffer;
 import com.lapissea.vulkanimpl.util.types.VkCommandPool;
 import com.lapissea.vulkanimpl.util.types.VkSemaphore;
 import gnu.trove.list.TIntList;
@@ -20,7 +21,6 @@ import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkGpu implements VkDestroyable, VkGpuCtx{
-	
 	
 	public class Queue{
 		
@@ -284,6 +284,16 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	
 	public void waitIdle(){
 		vkDeviceWaitIdle(getDevice());
+	}
+	
+	public VkBuffer createBuffer(VkBufferCreateInfo bufferInfo){
+		return Vk.createBuffer(this, bufferInfo);
+	}
+	
+	public VkMemoryRequirements getMemRequirements(MemoryStack stack, VkBuffer buffer){
+		VkMemoryRequirements memRequirements=VkMemoryRequirements.mallocStack(stack);
+		vkGetBufferMemoryRequirements(getDevice(), buffer.getHandle(), memRequirements);
+		return memRequirements;
 	}
 	
 }

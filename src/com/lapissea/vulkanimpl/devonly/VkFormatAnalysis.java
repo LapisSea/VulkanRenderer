@@ -7,7 +7,6 @@ import com.lapissea.vulkanimpl.util.VkFormatInfo;
 import com.lapissea.vulkanimpl.util.VkFormatInfo.Component;
 import com.lapissea.vulkanimpl.util.VkFormatInfo.ComponentType;
 import com.lapissea.vulkanimpl.util.VkFormatInfo.StorageType;
-import gnu.trove.map.hash.TIntObjectHashMap;
 import org.lwjgl.vulkan.VK10;
 
 import java.lang.reflect.Field;
@@ -46,29 +45,32 @@ public class VkFormatAnalysis{
 	
 	public static void generateCode(){
 		List<String> lines=new ArrayList<>();
-		compile().forEachEntry((k, v)->{
+		compile().parallelStream().forEach(v->{
 			BiFunction<Integer, String, String> wrapp=(i, s)->{
 				if(i==0) return "Collections.emptyList()";
 				else if(i==1) return "Collections.singletonList("+s+")";
 				else return "Arrays.asList("+s+")";
 			};
-			String line="INFO.put("+k+", new "+VkFormatInfo.class.getSimpleName()+"(\""+v.name+"\", "+
+			String line="INFO.put("+v.handle+", new "+VkFormatInfo.class.getSimpleName()+"("+v.handle+", \""+v.name+"\", "+
 			            wrapp.apply(v.components.size(), v.components.stream().map(c->"new Component(ComponentType."+c.type+", "+c.bitSize+", StorageType."+c.storageType+", "+c.signed+(c.packId==-1?"":", "+c.packId)+")").collect(Collectors.joining(", ")))+", "+
 			            wrapp.apply(v.packSizes.size(), v.packSizes.stream().map(Object::toString).collect(Collectors.joining(", ")))+", "+
 			            (v.compression==null?"null":"\""+v.compression+"\"")+", "+
 			            v.isBlock+", "+
 			            (v.isBlock?"new Vec2iFinal("+v.blockSize.x()+", "+v.blockSize.y()+")":"null")+"));";
-			lines.add(line.replace("Collections.emptyList(), Collections.emptyList()", "EC, EP"));
-			return true;
+			synchronized(lines){
+				lines.add(line.replace("Collections.emptyList(), Collections.emptyList()", "EC, EP"));
+			}
 		});
 		
 		LogUtil.__.destroy();
+		LogUtil.println("List<Component> EC=Collections.emptyList();\n"+
+		                "List<Integer>   EP=Collections.emptyList();");
 		lines.stream().sorted(Comparator.comparingInt(String::length)).forEach(LogUtil::println);
 		
 		System.exit(0);
 	}
 	
-	public static TIntObjectHashMap<VkFormatInfo> compile(){
+	public static List<VkFormatInfo> compile(){
 		Pattern compElementPattern, blockSizePattern;
 		{
 			StringBuilder sb=new StringBuilder("[");
@@ -80,7 +82,7 @@ public class VkFormatAnalysis{
 		}
 		
 		
-		TIntObjectHashMap<VkFormatInfo> allInfo=new TIntObjectHashMap<>();
+		List<VkFormatInfo> allInfo=new ArrayList<>();
 		for(Field field : VK10.class.getDeclaredFields()){
 			String name=field.getName();
 			if(!name.startsWith("VK_FORMAT_")||name.startsWith("VK_FORMAT_FEATURE_")) continue;
@@ -190,10 +192,9 @@ public class VkFormatAnalysis{
 			components.trimToSize();
 			packSizes.trimToSize();
 			try{
-				allInfo.put(field.getInt(null), new VkFormatInfo(name, components, packSizes, compression, isBlock, blockSize.immutable()));
+				allInfo.add(new VkFormatInfo(field.getInt(null), name, components, packSizes, compression, isBlock, blockSize.immutable()));
 			}catch(IllegalAccessException e){}
 		}
-		allInfo.trimToSize();
 		return allInfo;
 	}
 }
