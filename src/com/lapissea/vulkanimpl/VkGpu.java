@@ -1,10 +1,12 @@
 package com.lapissea.vulkanimpl;
 
 import com.lapissea.vulkanimpl.util.DevelopmentInfo;
+import com.lapissea.vulkanimpl.util.VkConstruct;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import com.lapissea.vulkanimpl.util.types.VkBuffer;
 import com.lapissea.vulkanimpl.util.types.VkCommandPool;
+import com.lapissea.vulkanimpl.util.types.VkDeviceMemory;
 import com.lapissea.vulkanimpl.util.types.VkSemaphore;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -206,18 +208,31 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	}
 	
 	
-	public int findMemoryType(int typeBits, int properties){
+	public int findMemoryType(VkMemoryRequirements memRequ, int requestedProperties){
+		return findMemoryType(memRequ.memoryTypeBits(), requestedProperties);
+	}
+	
+	public int findMemoryType(int typeBits, int requestedProperties){
 		
 		int bits=typeBits;
 		for(int i=0;i<VK_MAX_MEMORY_TYPES;i++){
 			if((bits&1)==1){
-				if((memoryProperties.memoryTypes(i).propertyFlags()&properties)==properties){
+				if((memoryProperties.memoryTypes(i).propertyFlags()&requestedProperties)==requestedProperties){
 					return i;
 				}
 			}
 			bits>>=1;
 		}
 		return -1;
+	}
+	
+	public VkDeviceMemory allocateMemory(VkMemoryRequirements memRequ, long size, int requestedProperties){
+		try(MemoryStack stack=stackPush()){
+			VkMemoryAllocateInfo allocInfo=VkConstruct.memoryAllocateInfo(stack);
+			allocInfo.allocationSize(size)
+			         .memoryTypeIndex(findMemoryType(memRequ, requestedProperties));
+			return Vk.allocateMemory(this, allocInfo);
+		}
 	}
 	
 	public VkPhysicalDeviceFeatures getPhysicalFeatures(){

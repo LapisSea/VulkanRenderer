@@ -1,10 +1,14 @@
 package com.lapissea.vulkanimpl.renderer.model;
 
+import com.lapissea.util.LogUtil;
 import com.lapissea.vulkanimpl.util.VkFormatInfo;
 
 import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
+import java.util.List;
+
+import static org.lwjgl.vulkan.VK10.*;
 
 public class VkModelBuilder{
 	
@@ -35,35 +39,36 @@ public class VkModelBuilder{
 	
 	
 	public final VkModelFormat format;
-	private final LinkedList<int[]> indices      =new LinkedList<>();
+	private final LinkedList<int[]> indices      =new LinkedList<>(List.of(getIndexChunk()));
 	private       int               indexChunkPos=0;
 	
-	private final LinkedList<byte[]> data        =new LinkedList<>();
+	private final LinkedList<byte[]> data        =new LinkedList<>(List.of(getDataChunk()));
 	private       int                dataChunkPos=0;
-	private final ByteBuffer vertex;
 	
-	private int typePos;
-	private int vertexCount;
+	private final byte[]     vertexData;
+	private final ByteBuffer vertex;
+	private       int        typePos;
+	private       int        vertexCount;
 	
 	public VkModelBuilder(VkModelFormat format){
 		this.format=format;
-		vertex=ByteBuffer.allocate(format.getSize());
+		vertex=ByteBuffer.wrap(vertexData=new byte[format.getSize()]);
 	}
-	
-	
-	public ByteBuffer exportIndices(ByteBuffer dest){
-		if(indices.isEmpty()) return dest;
-		
-		for(int i1=0;i1<indices.size();i1++){
-			int i=indices.get(i1);
-			
-			dest.put((byte)(i&0xFF));
-			dest.put((byte)((i>>8)&0xFF));
-		}
-		indices.clear();
-		
-		return dest;
-	}
+
+
+//	public ByteBuffer exportIndices(ByteBuffer dest){
+//		if(indices.isEmpty()) return dest;
+//
+//		for(int i1=0;i1<indices.size();i1++){
+//			int i=indices.get(i1);
+//
+//			dest.put((byte)(i&0xFF));
+//			dest.put((byte)((i>>8)&0xFF));
+//		}
+//		indices.clear();
+//
+//		return dest;
+//	}
 	
 	private void put(float f, VkFormatInfo.Component comp){
 		switch(comp.bitSize){
@@ -78,6 +83,7 @@ public class VkModelBuilder{
 	public VkModelBuilder putF(float x){
 		VkFormatInfo i=getAndCheck(1);
 		put(x, i.components.get(0));
+		typePos++;
 		return this;
 	}
 	
@@ -85,6 +91,7 @@ public class VkModelBuilder{
 		VkFormatInfo i=getAndCheck(2);
 		put(x, i.components.get(0));
 		put(y, i.components.get(1));
+		typePos++;
 		return this;
 	}
 	
@@ -93,6 +100,7 @@ public class VkModelBuilder{
 		put(x, i.components.get(0));
 		put(y, i.components.get(1));
 		put(z, i.components.get(2));
+		typePos++;
 		return this;
 	}
 	
@@ -102,6 +110,7 @@ public class VkModelBuilder{
 		put(y, i.components.get(1));
 		put(z, i.components.get(2));
 		put(w, i.components.get(3));
+		typePos++;
 		return this;
 	}
 	
@@ -113,7 +122,22 @@ public class VkModelBuilder{
 	
 	public void next(){
 		vertexCount++;
-		data.addAll(vertex.array());
+		int pos=0;
+		
+		while(pos<vertexData.length){
+			byte[] chunk     =data.getLast();
+			int    toTransfer=Math.min(vertexData.length, chunk.length-dataChunkPos);
+			System.arraycopy(vertexData, pos, chunk, dataChunkPos, toTransfer);
+			dataChunkPos+=toTransfer;
+			pos+=toTransfer;
+			if(dataChunkPos==chunk.length){
+				dataChunkPos=0;
+				pos=0;
+				data.add(getDataChunk());
+			}
+		}
+		typePos=0;
+		vertex.position(0);
 	}
 	
 	public int getVertexCount(){
@@ -127,14 +151,14 @@ public class VkModelBuilder{
 	public int size(){
 		return data.size()+getIndexCount()*getIndexType().bytes;
 	}
-	
-	public void indices(int... indices){
-		this.indices.addAll(indices);
-	}
-	
-	public void indices(int id){
-		indices.add(id);
-	}
+
+//	public void indices(int... indices){
+//		this.indices.addAll(indices);
+//	}
+//
+//	public void indices(int id){
+//		indices.add(id);
+//	}
 	
 	public int getIndexCount(){
 		return indices.size();
@@ -143,4 +167,5 @@ public class VkModelBuilder{
 	public VkModel.IndexType getIndexType(){
 		return getIndexCount()<65535?VkModel.IndexType.SHORT:VkModel.IndexType.INT;
 	}
+	
 }

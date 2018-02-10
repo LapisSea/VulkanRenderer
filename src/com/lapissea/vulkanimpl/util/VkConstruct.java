@@ -4,6 +4,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.windows.DEVMODE;
 import org.lwjgl.vulkan.VkBufferCreateInfo;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
+import org.lwjgl.vulkan.VkMemoryAllocateInfo;
 
 import java.io.File;
 
@@ -18,6 +19,10 @@ public class VkConstruct{
 	
 	public static VkBufferCreateInfo bufferCreateInfo(MemoryStack stack){
 		return VkBufferCreateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO);
+	}
+	
+	public static VkMemoryAllocateInfo memoryAllocateInfo(MemoryStack stack){
+		return VkMemoryAllocateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO);
 	}
 	
 }

@@ -1,7 +1,6 @@
 package com.lapissea.vulkanimpl;
 
 import com.lapissea.datamanager.IDataManager;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.event.change.ChangeRegistryBool;
 import com.lapissea.vec.color.ColorM;
@@ -72,7 +71,8 @@ public class VulkanRenderer implements VkDestroyable{
 	
 	private boolean surfaceBad;
 	
-	private VkBuffer modelBuffer;
+	private VkBuffer       modelBuffer;
+	private VkDeviceMemory modelMemory;
 	
 	public VulkanRenderer(IDataManager assets){
 		this.assets=assets;
@@ -110,13 +110,18 @@ public class VulkanRenderer implements VkDestroyable{
 		VkModelFormat format=new VkModelFormat(VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32B32_SFLOAT);
 		
 		VkModelBuilder modelBuilder=new VkModelBuilder(format);
-		modelBuilder.putF(0, 0).putF(0, 0, 0).next();
+		modelBuilder.putF(0.5F, -0.5F).putF(1, 0, 0).next();
+		modelBuilder.putF(0, 0.5F).putF(0, 1, 0).next();
+		modelBuilder.putF(-0.5F, -0.5F).putF(0, 0, 1).next();
 		
 		try(MemoryStack stack=stackPush()){
 			VkBufferCreateInfo bufferInfo=VkConstruct.bufferCreateInfo(stack);
 			bufferInfo.size(modelBuilder.dataSize())
 			          .usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-			VkBuffer buffer=renderGpu.createBuffer(bufferInfo);
+			modelBuffer=renderGpu.createBuffer(bufferInfo);
+			modelMemory=renderGpu.allocateMemory(renderGpu.getMemRequirements(stack, modelBuffer), modelBuffer.size, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			modelMemory.bindBuffer(modelBuffer);
+			modelMemory.map()
 		}
 	}
 	
@@ -317,6 +322,9 @@ public class VulkanRenderer implements VkDestroyable{
 		
 		modelBuffer.destroy();
 		surface.destroy();
+		
+		modelMemory.destroy();
+		modelBuffer.destroy();
 		
 		if(DEV_ON){
 			debugReport.destroy();

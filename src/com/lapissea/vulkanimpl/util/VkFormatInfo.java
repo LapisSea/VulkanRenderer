@@ -2,14 +2,11 @@ package com.lapissea.vulkanimpl.util;
 
 import com.lapissea.vec.Vec2iFinal;
 import com.lapissea.vec.interf.IVec2iR;
-import com.lapissea.vulkanimpl.devonly.VkFormatAnalysis;
 import gnu.trove.map.hash.TIntObjectHashMap;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
 
 public class VkFormatInfo{
 	
@@ -66,7 +63,7 @@ public class VkFormatInfo{
 	}
 	
 	
-	public final int handle;
+	public final int             handle;
 	public final String          name;
 	public final List<Component> components;
 	public final List<Integer>   packSizes;
@@ -84,7 +81,7 @@ public class VkFormatInfo{
 		this.isBlock=isBlock;
 		this.blockSize=blockSize;
 		
-		totalByteSize=(packSizes.isEmpty()?components.stream().mapToInt(c->c.bitSize):packSizes.stream().mapToInt(c->c)).sum();
+		totalByteSize=(packSizes.isEmpty()?components.stream().mapToInt(c->c.bitSize):packSizes.stream().mapToInt(c->c)).sum()/Byte.SIZE;
 	}
 	
 	@Override

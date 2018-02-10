@@ -419,11 +419,19 @@ public class Vk{
 	}
 	
 	public static VkBuffer createBuffer(VkGpuCtx gpuCtx, VkBufferCreateInfo bufferInfo){
-		LongBuffer dest=memAllocLong(1);
-		int        code=vkCreateBuffer(gpuCtx.getDevice(), bufferInfo, null, dest);
+		LongBuffer handle=memAllocLong(1);
+		int        code  =vkCreateBuffer(gpuCtx.getDevice(), bufferInfo, null, handle);
 		if(DEV_ON) check(code);
-		return new VkBuffer(gpuCtx, dest, bufferInfo.size());
+		return new VkBuffer(gpuCtx, handle, bufferInfo.size());
 	}
+	
+	public static VkDeviceMemory allocateMemory(VkGpuCtx gpuCtx, VkMemoryAllocateInfo allocInfo){
+		LongBuffer handle=memAllocLong(1);
+		int        code  =vkAllocateMemory(gpuCtx.getDevice(), allocInfo, null, handle);
+		if(DEV_ON) check(code);
+		return new VkDeviceMemory(gpuCtx.getGpu(), handle);
+	}
+	
 	/*/START_GEN/*/
 	//lel
 	
