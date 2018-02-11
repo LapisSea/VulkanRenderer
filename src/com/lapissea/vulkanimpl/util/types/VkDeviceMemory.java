@@ -39,7 +39,6 @@ public class VkDeviceMemory implements VkGpuCtx, VkDestroyable{
 	}
 	
 	public void map(long offset,long size){
-		
 		vkMapMemory(getDevice(),handle.get(0),offset,size,);
 		
 	}
