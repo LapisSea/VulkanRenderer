@@ -432,6 +432,12 @@ public class Vk{
 		return new VkDeviceMemory(gpuCtx.getGpu(), handle);
 	}
 	
+	public static PointerBuffer mapMemory(VkDevice device, long memory, long offset, long size, int flags, PointerBuffer dest){
+		int code=vkMapMemory(device, memory, offset, size, flags, dest);
+		if(DEV_ON) check(code);
+		return dest;
+	}
+	
 	/*/START_GEN/*/
 	//lel
 	

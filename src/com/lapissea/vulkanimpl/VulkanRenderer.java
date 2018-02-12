@@ -121,7 +121,10 @@ public class VulkanRenderer implements VkDestroyable{
 			modelBuffer=renderGpu.createBuffer(bufferInfo);
 			modelMemory=renderGpu.allocateMemory(renderGpu.getMemRequirements(stack, modelBuffer), modelBuffer.size, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			modelMemory.bindBuffer(modelBuffer);
-			modelMemory.map()
+			
+			try(VkDeviceMemory.MemorySession ms=modelMemory.new MemorySession(modelBuffer.size)){
+			
+			}
 		}
 	}
 	
