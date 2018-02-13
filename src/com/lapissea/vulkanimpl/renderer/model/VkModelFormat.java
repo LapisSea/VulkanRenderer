@@ -1,6 +1,6 @@
 package com.lapissea.vulkanimpl.renderer.model;
 
-import com.lapissea.vulkanimpl.util.VkFormatInfo;
+import com.lapissea.vulkanimpl.util.format.VkFormatInfo;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkVertexInputAttributeDescription;
 import org.lwjgl.vulkan.VkVertexInputBindingDescription;

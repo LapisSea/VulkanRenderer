@@ -7,6 +7,7 @@ import com.lapissea.vec.color.ColorM;
 import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.devonly.ValidationLayers;
 import com.lapissea.vulkanimpl.devonly.VkDebugReport;
+import com.lapissea.vulkanimpl.renderer.model.VkModel;
 import com.lapissea.vulkanimpl.renderer.model.VkModelBuilder;
 import com.lapissea.vulkanimpl.renderer.model.VkModelFormat;
 import com.lapissea.vulkanimpl.shaders.ShaderState;
@@ -15,7 +16,10 @@ import com.lapissea.vulkanimpl.shaders.VkShader;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import com.lapissea.vulkanimpl.util.VkConstruct;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
-import com.lapissea.vulkanimpl.util.types.*;
+import com.lapissea.vulkanimpl.util.types.VkCommandBufferM;
+import com.lapissea.vulkanimpl.util.types.VkCommandPool;
+import com.lapissea.vulkanimpl.util.types.VkRenderPass;
+import com.lapissea.vulkanimpl.util.types.VkSurface;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
@@ -71,8 +75,7 @@ public class VulkanRenderer implements VkDestroyable{
 	
 	private boolean surfaceBad;
 	
-	private VkBuffer       modelBuffer;
-	private VkDeviceMemory modelMemory;
+	private VkModel model;
 	
 	public VulkanRenderer(IDataManager assets){
 		this.assets=assets;
@@ -107,25 +110,14 @@ public class VulkanRenderer implements VkDestroyable{
 	}
 	
 	private void initModel(){
-		VkModelFormat format=new VkModelFormat(VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32B32_SFLOAT);
+		VkModelFormat format=new VkModelFormat(VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_A8B8G8R8_UINT_PACK32);
 		
 		VkModelBuilder modelBuilder=new VkModelBuilder(format);
-		modelBuilder.putF(0.5F, -0.5F).putF(1, 0, 0).next();
-		modelBuilder.putF(0, 0.5F).putF(0, 1, 0).next();
-		modelBuilder.putF(-0.5F, -0.5F).putF(0, 0, 1).next();
+		modelBuilder.putF(+0.0F, +0.5F).putI(0xFF_00_FF_00).next();
+		modelBuilder.putF(-0.5F, -0.5F).putI(0xFF_00_00_FF).next();
+		modelBuilder.putF(+0.5F, -0.5F).putI(0xFF_FF_00_00).next();
 		
-		try(MemoryStack stack=stackPush()){
-			VkBufferCreateInfo bufferInfo=VkConstruct.bufferCreateInfo(stack);
-			bufferInfo.size(modelBuilder.dataSize())
-			          .usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-			modelBuffer=renderGpu.createBuffer(bufferInfo);
-			modelMemory=renderGpu.allocateMemory(renderGpu.getMemRequirements(stack, modelBuffer), modelBuffer.size, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-			modelMemory.bindBuffer(modelBuffer);
-			
-			try(VkDeviceMemory.MemorySession ms=modelMemory.new MemorySession(modelBuffer.size)){
-			
-			}
-		}
+		model=modelBuilder.finish(renderGpu);
 	}
 	
 	private void initSurfaceDependant(){
@@ -150,7 +142,9 @@ public class VulkanRenderer implements VkDestroyable{
 			renderPass.begin(sceneBuffer, frame.getFrameBuffer(), surface.getSize(), new ColorM(0, 0, 0, 0));
 			
 			shader.bind(sceneBuffer);
-			sceneBuffer.render(3);
+			
+			model.bind(sceneBuffer);
+			model.render(sceneBuffer);
 			
 			sceneBuffer.endRenderPass();
 			sceneBuffer.end();
@@ -323,11 +317,8 @@ public class VulkanRenderer implements VkDestroyable{
 		
 		destroySurfaceDependant();
 		
-		modelBuffer.destroy();
 		surface.destroy();
 		
-		modelMemory.destroy();
-		modelBuffer.destroy();
 		
 		if(DEV_ON){
 			debugReport.destroy();

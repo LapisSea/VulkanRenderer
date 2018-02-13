@@ -1,18 +1,28 @@
 package com.lapissea.vulkanimpl.renderer.model;
 
 import com.lapissea.util.LogUtil;
-import com.lapissea.vulkanimpl.util.VkFormatInfo;
+import com.lapissea.vulkanimpl.VkGpu;
+import com.lapissea.vulkanimpl.util.VkConstruct;
+import com.lapissea.vulkanimpl.util.format.VKFormatWriter;
+import com.lapissea.vulkanimpl.util.format.VkFormatInfo;
+import com.lapissea.vulkanimpl.util.types.VkBuffer;
+import com.lapissea.vulkanimpl.util.types.VkDeviceMemory;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.VkBufferCreateInfo;
 
 import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkModelBuilder{
 	
-	private static final int DATA_CHUNK_SIZE=1<<6;
+	private static final int DATA_CHUNK_SIZE =1<<6;
+	private static final int INDEX_CHUNK_SIZE=1<<6;
 	
 	private static final LinkedList<SoftReference<byte[]>> DATA_CACHE =new LinkedList<>();
 	private static final LinkedList<SoftReference<int[]>>  INDEX_CACHE=new LinkedList<>();
@@ -80,48 +90,42 @@ public class VkModelBuilder{
 		throw new RuntimeException("unsupported bit size "+comp.bitSize);
 	}
 	
+	
+	public VkModelBuilder putI(int x){
+		this.<VKFormatWriter.I>get().write(x);
+		return this;
+	}
+	
+	
 	public VkModelBuilder putF(float x){
-		VkFormatInfo i=getAndCheck(1);
-		put(x, i.components.get(0));
-		typePos++;
+		this.<VKFormatWriter.F>get().write(x);
 		return this;
 	}
 	
 	public VkModelBuilder putF(float x, float y){
-		VkFormatInfo i=getAndCheck(2);
-		put(x, i.components.get(0));
-		put(y, i.components.get(1));
-		typePos++;
+		this.<VKFormatWriter.FF>get().write(x, y);
 		return this;
 	}
 	
 	public VkModelBuilder putF(float x, float y, float z){
-		VkFormatInfo i=getAndCheck(3);
-		put(x, i.components.get(0));
-		put(y, i.components.get(1));
-		put(z, i.components.get(2));
-		typePos++;
+		this.<VKFormatWriter.FFF>get().write(x, y, z);
 		return this;
 	}
 	
 	public VkModelBuilder putF(float x, float y, float z, float w){
-		VkFormatInfo i=getAndCheck(3);
-		put(x, i.components.get(0));
-		put(y, i.components.get(1));
-		put(z, i.components.get(2));
-		put(w, i.components.get(3));
-		typePos++;
+		this.<VKFormatWriter.FFFF>get().write(x, y, z, w);
 		return this;
 	}
 	
-	private VkFormatInfo getAndCheck(int size){
-		VkFormatInfo i=format.getType(typePos);
-		if(i.components.size()!=size) throw new IllegalArgumentException(i.name+" needs "+i.components.size()+" values");
-		return i;
+	
+	private <T extends VKFormatWriter> T get(){
+		T t=(T)format.getType(typePos).getWriter();
+		t.setDest(vertex);
+		typePos++;
+		return t;
 	}
 	
 	public void next(){
-		vertexCount++;
 		int pos=0;
 		
 		while(pos<vertexData.length){
@@ -138,34 +142,48 @@ public class VkModelBuilder{
 		}
 		typePos=0;
 		vertex.position(0);
+		vertexCount++;
 	}
 	
-	public int getVertexCount(){
-		return vertexCount;
+	public int indexCount(){
+		return (indices.size()-1)*INDEX_CHUNK_SIZE+indexChunkPos;
 	}
 	
 	public int dataSize(){
-		return data.size();
+		return (data.size()-1)*INDEX_CHUNK_SIZE+dataChunkPos;
 	}
 	
-	public int size(){
-		return data.size()+getIndexCount()*getIndexType().bytes;
-	}
-
-//	public void indices(int... indices){
-//		this.indices.addAll(indices);
-//	}
-//
-//	public void indices(int id){
-//		indices.add(id);
-//	}
 	
-	public int getIndexCount(){
-		return indices.size();
+	public void putVertexData(ByteBuffer dest){
+		Iterator<byte[]> iter=data.iterator();
+		for(int i=0, j=data.size()-1;i<j;i++){
+			dest.put(iter.next());
+		}
+		dest.put(iter.next(), 0, dataChunkPos);
+		LogUtil.println(dest);
 	}
 	
-	public VkModel.IndexType getIndexType(){
-		return getIndexCount()<65535?VkModel.IndexType.SHORT:VkModel.IndexType.INT;
+	public VkModel finish(VkGpu gpu){
+		try(MemoryStack stack=stackPush()){
+			
+			VkBufferCreateInfo bufferInfo=VkConstruct.bufferCreateInfo(stack);
+			bufferInfo.usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
+			          .size(dataSize());
+			
+			int               indexCount=indexCount();
+			boolean           indexed   =indexCount>0;
+			VkModel.IndexType indexType =indexCount<65535?VkModel.IndexType.SHORT:VkModel.IndexType.INT;
+			
+			if(indexed) throw new RuntimeException();// bufferInfo.size(bufferInfo.size()+indexCount*indexType.bytes);
+			
+			VkBuffer       modelBuffer=gpu.createBuffer(bufferInfo);
+			VkDeviceMemory modelMemory=gpu.allocateMemory(gpu.getMemRequirements(stack, modelBuffer), modelBuffer.size, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+			modelMemory.bindBuffer(modelBuffer);
+			
+			modelMemory.memorySession(modelBuffer.size, this::putVertexData);
+			modelMemory.flushRanges();
+			
+			return new VkModel.Raw(modelBuffer, modelMemory, vertexCount);
+		}
 	}
-	
 }

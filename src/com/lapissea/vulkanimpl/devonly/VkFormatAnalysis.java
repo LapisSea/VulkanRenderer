@@ -3,10 +3,10 @@ package com.lapissea.vulkanimpl.devonly;
 import com.lapissea.util.LogUtil;
 import com.lapissea.vec.Vec2i;
 import com.lapissea.vulkanimpl.util.DevelopmentInfo;
-import com.lapissea.vulkanimpl.util.VkFormatInfo;
-import com.lapissea.vulkanimpl.util.VkFormatInfo.Component;
-import com.lapissea.vulkanimpl.util.VkFormatInfo.ComponentType;
-import com.lapissea.vulkanimpl.util.VkFormatInfo.StorageType;
+import com.lapissea.vulkanimpl.util.format.VkFormatInfo;
+import com.lapissea.vulkanimpl.util.format.VkFormatInfo.Component;
+import com.lapissea.vulkanimpl.util.format.VkFormatInfo.ComponentType;
+import com.lapissea.vulkanimpl.util.format.VkFormatInfo.StorageType;
 import org.lwjgl.vulkan.VK10;
 
 import java.lang.reflect.Field;
@@ -119,10 +119,10 @@ public class VkFormatAnalysis{
 				String word=words[wordId];
 				
 				if(word.equals("UNDEFINED")) break;
-				if(!lastWordCompList) flush.run();
 				
 				//is word component list?
 				if(compElementPattern.matcher(word).replaceAll("").isEmpty()){
+					if(!lastWordCompList) flush.run();
 					
 					
 					Matcher parts=compElementPattern.matcher(word);

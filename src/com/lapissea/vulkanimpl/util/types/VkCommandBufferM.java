@@ -49,10 +49,6 @@ public class VkCommandBufferM extends VkCommandBuffer implements VkGpuCtx, VkDes
 		}
 	}
 	
-	public void render(int vertexCount){
-		vkCmdDraw(this, vertexCount, 1, 0, 0);
-	}
-	
 	public void endRenderPass(){
 		vkCmdEndRenderPass(this);
 	}

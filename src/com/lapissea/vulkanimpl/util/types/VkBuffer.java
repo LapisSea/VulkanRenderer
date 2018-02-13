@@ -35,4 +35,8 @@ public class VkBuffer implements VkGpuCtx, VkDestroyable{
 	public long getHandle(){
 		return handle.get(0);
 	}
+	
+	public LongBuffer getBuff(){
+		return handle;
+	}
 }

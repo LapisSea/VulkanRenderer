@@ -229,7 +229,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	public VkDeviceMemory allocateMemory(VkMemoryRequirements memRequ, long size, int requestedProperties){
 		try(MemoryStack stack=stackPush()){
 			VkMemoryAllocateInfo allocInfo=VkConstruct.memoryAllocateInfo(stack);
-			allocInfo.allocationSize(size)
+			allocInfo.allocationSize(Math.max(memRequ.size(), size))
 			         .memoryTypeIndex(findMemoryType(memRequ, requestedProperties));
 			return Vk.allocateMemory(this, allocInfo);
 		}

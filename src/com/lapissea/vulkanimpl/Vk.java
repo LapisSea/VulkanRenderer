@@ -438,6 +438,15 @@ public class Vk{
 		return dest;
 	}
 	
+	public static void flushMappedMemoryRanges(VkDevice device, VkMappedMemoryRange info){
+		int code=vkFlushMappedMemoryRanges(device, info);
+		if(DEV_ON) check(code);
+	}
+	
+	public static void invalidateMappedMemoryRanges(VkDevice device, VkMappedMemoryRange info){
+		int code=vkInvalidateMappedMemoryRanges(device, info);
+		if(DEV_ON) check(code);
+	}
 	/*/START_GEN/*/
 	//lel
 	
