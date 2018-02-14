@@ -160,10 +160,9 @@ public class VkModelBuilder{
 			dest.put(iter.next());
 		}
 		dest.put(iter.next(), 0, dataChunkPos);
-		LogUtil.println(dest);
 	}
 	
-	public VkModel finish(VkGpu gpu){
+	public VkModel bake(VkGpu gpu){
 		try(MemoryStack stack=stackPush()){
 			
 			VkBufferCreateInfo bufferInfo=VkConstruct.bufferCreateInfo(stack);
@@ -177,13 +176,14 @@ public class VkModelBuilder{
 			if(indexed) throw new RuntimeException();// bufferInfo.size(bufferInfo.size()+indexCount*indexType.bytes);
 			
 			VkBuffer       modelBuffer=gpu.createBuffer(bufferInfo);
-			VkDeviceMemory modelMemory=gpu.allocateMemory(gpu.getMemRequirements(stack, modelBuffer), modelBuffer.size, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+			VkDeviceMemory modelMemory=gpu.allocateMemory(gpu.getMemRequirements(stack, modelBuffer), modelBuffer.size, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			modelMemory.bindBuffer(modelBuffer);
 			
 			modelMemory.memorySession(modelBuffer.size, this::putVertexData);
-			modelMemory.flushRanges();
+//			modelMemory.flushRanges(1);
+//			modelMemory.invalidateRanges(modelBuffer.size);
 			
-			return new VkModel.Raw(modelBuffer, modelMemory, vertexCount);
+			return new VkModel.Raw(modelBuffer, modelMemory, format, vertexCount);
 		}
 	}
 }

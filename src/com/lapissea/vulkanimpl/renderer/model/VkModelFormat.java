@@ -1,5 +1,6 @@
 package com.lapissea.vulkanimpl.renderer.model;
 
+import com.lapissea.util.LogUtil;
 import com.lapissea.vulkanimpl.util.format.VkFormatInfo;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkVertexInputAttributeDescription;
@@ -35,7 +36,6 @@ public class VkModelFormat{
 		     .binding(0)
 		     .stride(size)
 		     .inputRate(VK_VERTEX_INPUT_RATE_VERTEX);
-		
 		return input;
 	}
 	

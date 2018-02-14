@@ -59,7 +59,7 @@ public class ApplicationVk{
 		}
 		
 		vkRenderer=new VulkanRenderer(manger);
-//		vkRenderer.getSettings().trippleBufferingEnabled.set(false);
+		vkRenderer.getSettings().trippleBufferingEnabled.set(false);
 		GlfwMonitor.init();
 		
 		Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "shutdown-thread"));

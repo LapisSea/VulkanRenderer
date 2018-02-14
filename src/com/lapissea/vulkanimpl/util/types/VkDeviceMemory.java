@@ -1,5 +1,6 @@
 package com.lapissea.vulkanimpl.util.types;
 
+import com.lapissea.util.LogUtil;
 import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
@@ -46,9 +47,7 @@ public class VkDeviceMemory implements VkGpuCtx, VkDestroyable{
 	public VkDeviceMemory(VkGpuCtx gpuCtx, LongBuffer dest){
 		gpu=gpuCtx.getGpu();
 		handle=dest;
-		range.memory(handle.get(0))
-		     .size(VK_WHOLE_SIZE);
-		
+		range.memory(handle.get(0));
 	}
 	
 	@Override
@@ -79,12 +78,12 @@ public class VkDeviceMemory implements VkGpuCtx, VkDestroyable{
 		vkUnmapMemory(getDevice(), handle.get(0));
 	}
 	
-	public void flushRanges(){
-		Vk.flushMappedMemoryRanges(getDevice(), range);
+	public void flushRanges(long size){
+		Vk.flushMappedMemoryRanges(getDevice(), range.size(size));
 	}
 	
-	public void invalidateRanges(){
-		Vk.invalidateMappedMemoryRanges(getDevice(), range);
+	public void invalidateRanges(long size){
+		Vk.invalidateMappedMemoryRanges(getDevice(), range.size(size));
 	}
 	
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

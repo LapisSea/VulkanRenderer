@@ -1,0 +1,4 @@
+C:\Programming\Java\FastFolderUtil\VulkanRender\res\assets\shaders\test.frag:4: 'int' : must be qualified as flat in
+C:\Programming\Java\FastFolderUtil\VulkanRender\res\assets\shaders\test.frag:4: '' : compilation terminated 
+2 compilation errors.  No code generated.
+Linking fragment stage: Missing entry point: Each stage requires one entry point

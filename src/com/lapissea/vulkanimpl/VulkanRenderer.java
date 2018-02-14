@@ -110,23 +110,24 @@ public class VulkanRenderer implements VkDestroyable{
 	}
 	
 	private void initModel(){
-		VkModelFormat format=new VkModelFormat(VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_A8B8G8R8_UINT_PACK32);
+		VkModelFormat format=new VkModelFormat(VK_FORMAT_R32G32B32_SFLOAT);
 		
 		VkModelBuilder modelBuilder=new VkModelBuilder(format);
-		modelBuilder.putF(+0.0F, +0.5F).putI(0xFF_00_FF_00).next();
-		modelBuilder.putF(-0.5F, -0.5F).putI(0xFF_00_00_FF).next();
-		modelBuilder.putF(+0.5F, -0.5F).putI(0xFF_FF_00_00).next();
+//		modelBuilder.putF(+0.0F, +0.5F).putI(0xFF_00_FF_00).next();
+//		modelBuilder.putF(-0.5F, -0.5F).putI(0xFF_00_00_FF).next();
+//		modelBuilder.putF(+0.5F, -0.5F).putI(0xFF_FF_00_00).next();
+		modelBuilder.putF(0,1,1).next();
+		modelBuilder.putF(1,0,0).next();
+		modelBuilder.putF(1,1,0).next();
 		
-		model=modelBuilder.finish(renderGpu);
+		model=modelBuilder.bake(renderGpu);
 	}
 	
 	private void initSurfaceDependant(){
 		
-		VkModelFormat format=new VkModelFormat(VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R8G8B8_UNORM);
-		
 		swapchain=new VkSwapchain(renderGpu, surface);
 		renderPass=createRenderPass();
-		shader=createGraphicsPipeline(format);
+		shader=createGraphicsPipeline(model.getFormat());
 		graphicsPool=renderGpu.getGraphicsQueue().createCommandPool();
 		swapchain.initFrameBuffers(renderPass);
 		initScene();
@@ -181,7 +182,7 @@ public class VulkanRenderer implements VkDestroyable{
 			dependency.get(0)
 			          .srcSubpass(VK_SUBPASS_EXTERNAL)
 			          .dstSubpass(0)
-			          .srcStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)//wait for swapchain to finish reading the image that is presented
+			          .srcStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)//wait for swapchain to bake reading the image that is presented
 			          .srcAccessMask(0)
 			          .dstStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
 			          .dstAccessMask(VK_ACCESS_COLOR_ATTACHMENT_READ_BIT|VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
