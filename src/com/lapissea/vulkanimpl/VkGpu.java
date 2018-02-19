@@ -228,9 +228,11 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	
 	public VkDeviceMemory allocateMemory(VkMemoryRequirements memRequ, long size, int requestedProperties){
 		try(MemoryStack stack=stackPush()){
+			int memIndex=findMemoryType(memRequ, requestedProperties);
+			if(memIndex==-1) throw new IllegalArgumentException("Can not find memory with properties: "+Integer.toString(requestedProperties, 2));
 			VkMemoryAllocateInfo allocInfo=VkConstruct.memoryAllocateInfo(stack);
 			allocInfo.allocationSize(Math.max(memRequ.size(), size))
-			         .memoryTypeIndex(findMemoryType(memRequ, requestedProperties));
+			         .memoryTypeIndex(memIndex);
 			return Vk.allocateMemory(this, allocInfo);
 		}
 	}
@@ -299,6 +301,12 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	
 	public void waitIdle(){
 		vkDeviceWaitIdle(getDevice());
+	}
+	
+	public VkBuffer createBuffer(int usage, long size){
+		try(VkBufferCreateInfo bufferInfo=VkConstruct.bufferCreateInfo()){
+			return createBuffer(bufferInfo.usage(usage).size(size));
+		}
 	}
 	
 	public VkBuffer createBuffer(VkBufferCreateInfo bufferInfo){

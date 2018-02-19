@@ -8,6 +8,7 @@ VK vkEnumeratePhysicalDevices basic optional=3,null
 
 package com.lapissea.vulkanimpl;
 
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
@@ -429,7 +430,8 @@ public class Vk{
 		LongBuffer handle=memAllocLong(1);
 		int        code  =vkAllocateMemory(gpuCtx.getDevice(), allocInfo, null, handle);
 		if(DEV_ON) check(code);
-		return new VkDeviceMemory(gpuCtx.getGpu(), handle);
+		LogUtil.println(allocInfo.allocationSize(),allocInfo.memoryTypeIndex());
+		return new VkDeviceMemory(gpuCtx.getGpu(), handle,allocInfo.allocationSize());
 	}
 	
 	public static PointerBuffer mapMemory(VkDevice device, long memory, long offset, long size, int flags, PointerBuffer dest){

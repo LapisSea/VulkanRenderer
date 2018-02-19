@@ -2,13 +2,12 @@ package com.lapissea.vulkanimpl.renderer.model;
 
 import com.lapissea.util.LogUtil;
 import com.lapissea.vulkanimpl.VkGpu;
-import com.lapissea.vulkanimpl.util.VkConstruct;
 import com.lapissea.vulkanimpl.util.format.VKFormatWriter;
 import com.lapissea.vulkanimpl.util.format.VkFormatInfo;
 import com.lapissea.vulkanimpl.util.types.VkBuffer;
 import com.lapissea.vulkanimpl.util.types.VkDeviceMemory;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.vulkan.VkBufferCreateInfo;
 
 import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
@@ -17,6 +16,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import static org.lwjgl.system.MemoryStack.*;
+import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkModelBuilder{
@@ -156,32 +156,42 @@ public class VkModelBuilder{
 	
 	public void putVertexData(ByteBuffer dest){
 		Iterator<byte[]> iter=data.iterator();
-		for(int i=0, j=data.size()-1;i<j;i++){
-			dest.put(iter.next());
+		byte[]           chunk;
+		if(data.size()>1){
+			for(int i=0, j=data.size()-1;i<j;i++){
+				dest.put(chunk=iter.next());
+				DATA_CACHE.add(new SoftReference<>(chunk));
+			}
 		}
-		dest.put(iter.next(), 0, dataChunkPos);
+		dest.put(chunk=iter.next(), 0, dataChunkPos);
+		DATA_CACHE.add(new SoftReference<>(chunk));
 	}
 	
 	public VkModel bake(VkGpu gpu){
 		try(MemoryStack stack=stackPush()){
+			LogUtil.println(dataSize());
 			
-			VkBufferCreateInfo bufferInfo=VkConstruct.bufferCreateInfo(stack);
-			bufferInfo.usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
-			          .size(dataSize());
-			
+			int               dataSize  =dataSize();
 			int               indexCount=indexCount();
 			boolean           indexed   =indexCount>0;
 			VkModel.IndexType indexType =indexCount<65535?VkModel.IndexType.SHORT:VkModel.IndexType.INT;
 			
 			if(indexed) throw new RuntimeException();// bufferInfo.size(bufferInfo.size()+indexCount*indexType.bytes);
 			
-			VkBuffer       modelBuffer=gpu.createBuffer(bufferInfo);
-			VkDeviceMemory modelMemory=gpu.allocateMemory(gpu.getMemRequirements(stack, modelBuffer), modelBuffer.size, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			VkBuffer modelBuffer=gpu.createBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, dataSize);
+			
+			VkDeviceMemory modelMemory=gpu.allocateMemory(gpu.getMemRequirements(stack, modelBuffer), modelBuffer.size,
+			                                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 			modelMemory.bindBuffer(modelBuffer);
 			
-			modelMemory.memorySession(modelBuffer.size, this::putVertexData);
-//			modelMemory.flushRanges(1);
-//			modelMemory.invalidateRanges(modelBuffer.size);
+			PointerBuffer pointer=memAllocPointer(1);
+			modelMemory.map(0, modelMemory.size, pointer);
+			putVertexData(pointer.getByteBuffer((int)modelMemory.size));
+			modelMemory.unmap();
+			modelMemory.flushRanges(modelMemory.size);
+			modelMemory.invalidateRanges(modelMemory.size);
+
+//			modelMemory.memorySession(modelBuffer.size, this::putVertexData);
 			
 			return new VkModel.Raw(modelBuffer, modelMemory, format, vertexCount);
 		}

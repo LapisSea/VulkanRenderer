@@ -20,6 +20,9 @@ public class VkConstruct{
 	public static VkBufferCreateInfo bufferCreateInfo(MemoryStack stack){
 		return VkBufferCreateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO);
 	}
+	public static VkBufferCreateInfo bufferCreateInfo(){
+		return VkBufferCreateInfo.calloc().sType(VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO);
+	}
 	
 	public static VkMemoryAllocateInfo memoryAllocateInfo(MemoryStack stack){
 		return VkMemoryAllocateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO);
