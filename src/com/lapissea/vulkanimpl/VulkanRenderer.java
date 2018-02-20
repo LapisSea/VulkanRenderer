@@ -110,15 +110,13 @@ public class VulkanRenderer implements VkDestroyable{
 	}
 	
 	private void initModel(){
-		VkModelFormat format=new VkModelFormat(VK_FORMAT_R32G32B32_SFLOAT);
+		VkModelFormat format=new VkModelFormat(VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT);
 		
 		VkModelBuilder modelBuilder=new VkModelBuilder(format);
-//		modelBuilder.putF(+0.0F, +0.5F).putI(0xFF_00_FF_00).next();
-//		modelBuilder.putF(-0.5F, -0.5F).putI(0xFF_00_00_FF).next();
-//		modelBuilder.putF(+0.5F, -0.5F).putI(0xFF_FF_00_00).next();
-		modelBuilder.putF(0,1,1).next();
-		modelBuilder.putF(1,0,0).next();
-		modelBuilder.putF(1,1,0).next();
+		modelBuilder.put3F(-0.5F, -0.5F, 0).put4F(1,0,0,1).next();
+		modelBuilder.put3F(+0.0F, +0.5F, 0).put4F(0,1,0,1).next();
+		modelBuilder.put3F(+0.5F, -0.5F, 0).put4F(1,1,1,1).next();
+		
 		
 		model=modelBuilder.bake(renderGpu);
 	}

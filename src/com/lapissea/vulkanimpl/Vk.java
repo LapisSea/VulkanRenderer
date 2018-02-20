@@ -430,7 +430,6 @@ public class Vk{
 		LongBuffer handle=memAllocLong(1);
 		int        code  =vkAllocateMemory(gpuCtx.getDevice(), allocInfo, null, handle);
 		if(DEV_ON) check(code);
-		LogUtil.println(allocInfo.allocationSize(),allocInfo.memoryTypeIndex());
 		return new VkDeviceMemory(gpuCtx.getGpu(), handle,allocInfo.allocationSize());
 	}
 	

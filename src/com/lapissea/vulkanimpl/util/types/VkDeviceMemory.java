@@ -79,8 +79,16 @@ public class VkDeviceMemory implements VkGpuCtx, VkDestroyable{
 		vkUnmapMemory(getDevice(), handle.get(0));
 	}
 	
+	public void flushRanges(){
+		flushRanges(VK_WHOLE_SIZE);
+	}
+	
 	public void flushRanges(long size){
 		Vk.flushMappedMemoryRanges(getDevice(), range.size(size));
+	}
+	
+	public void invalidateRanges(){
+		invalidateRanges(VK_WHOLE_SIZE);
 	}
 	
 	public void invalidateRanges(long size){

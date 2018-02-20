@@ -1,22 +1,24 @@
 package com.lapissea.vulkanimpl.renderer.model;
 
 import com.lapissea.util.LogUtil;
+import com.lapissea.vec.Vec3f;
+import com.lapissea.vec.interf.IVec3fR;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.format.VKFormatWriter;
 import com.lapissea.vulkanimpl.util.format.VkFormatInfo;
 import com.lapissea.vulkanimpl.util.types.VkBuffer;
 import com.lapissea.vulkanimpl.util.types.VkDeviceMemory;
-import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.VkMemoryRequirements;
 
 import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
 import static org.lwjgl.system.MemoryStack.*;
-import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkModelBuilder{
@@ -62,7 +64,7 @@ public class VkModelBuilder{
 	
 	public VkModelBuilder(VkModelFormat format){
 		this.format=format;
-		vertex=ByteBuffer.wrap(vertexData=new byte[format.getSize()]);
+		vertex=ByteBuffer.wrap(vertexData=new byte[format.getSize()]).order(ByteOrder.nativeOrder());
 	}
 
 
@@ -91,28 +93,32 @@ public class VkModelBuilder{
 	}
 	
 	
-	public VkModelBuilder putI(int x){
+	public VkModelBuilder put1I(int x){
 		this.<VKFormatWriter.I>get().write(x);
 		return this;
 	}
 	
 	
-	public VkModelBuilder putF(float x){
+	public VkModelBuilder put1F(float x){
 		this.<VKFormatWriter.F>get().write(x);
 		return this;
 	}
 	
-	public VkModelBuilder putF(float x, float y){
+	public VkModelBuilder put2F(float x, float y){
 		this.<VKFormatWriter.FF>get().write(x, y);
 		return this;
 	}
 	
-	public VkModelBuilder putF(float x, float y, float z){
+	public VkModelBuilder put3F(float x, float y, float z){
 		this.<VKFormatWriter.FFF>get().write(x, y, z);
 		return this;
 	}
 	
-	public VkModelBuilder putF(float x, float y, float z, float w){
+	public VkModelBuilder put3F(IVec3fR vec){
+		return put3F(vec.x(), vec.y(), vec.z());
+	}
+	
+	public VkModelBuilder put4F(float x, float y, float z, float w){
 		this.<VKFormatWriter.FFFF>get().write(x, y, z, w);
 		return this;
 	}
@@ -126,6 +132,11 @@ public class VkModelBuilder{
 	}
 	
 	public void next(){
+		
+		for(int i=0;i<vertexData.length;i++){
+			vertexData[i]+=i+vertexCount*vertexData.length;
+		}
+		
 		int pos=0;
 		
 		while(pos<vertexData.length){
@@ -143,6 +154,8 @@ public class VkModelBuilder{
 		typePos=0;
 		vertex.position(0);
 		vertexCount++;
+		LogUtil.println(data);
+		LogUtil.println(dataSize(),data.size());
 	}
 	
 	public int indexCount(){
@@ -169,8 +182,6 @@ public class VkModelBuilder{
 	
 	public VkModel bake(VkGpu gpu){
 		try(MemoryStack stack=stackPush()){
-			LogUtil.println(dataSize());
-			
 			int               dataSize  =dataSize();
 			int               indexCount=indexCount();
 			boolean           indexed   =indexCount>0;
@@ -178,20 +189,17 @@ public class VkModelBuilder{
 			
 			if(indexed) throw new RuntimeException();// bufferInfo.size(bufferInfo.size()+indexCount*indexType.bytes);
 			
-			VkBuffer modelBuffer=gpu.createBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, dataSize);
+			VkBuffer             modelBuffer=gpu.createBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, dataSize);
+			VkMemoryRequirements memRequ    =modelBuffer.getMemRequirements(stack);
 			
-			VkDeviceMemory modelMemory=gpu.allocateMemory(gpu.getMemRequirements(stack, modelBuffer), modelBuffer.size,
-			                                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+			VkDeviceMemory modelMemory=gpu.allocateMemory(memRequ, modelBuffer.size, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			modelMemory.bindBuffer(modelBuffer);
+			modelMemory.memorySession(modelBuffer.size, mem->{
+				putVertexData(mem);
+				modelMemory.flushRanges(modelBuffer.size);
+				modelMemory.invalidateRanges(modelBuffer.size);
+			});
 			
-			PointerBuffer pointer=memAllocPointer(1);
-			modelMemory.map(0, modelMemory.size, pointer);
-			putVertexData(pointer.getByteBuffer((int)modelMemory.size));
-			modelMemory.unmap();
-			modelMemory.flushRanges(modelMemory.size);
-			modelMemory.invalidateRanges(modelMemory.size);
-
-//			modelMemory.memorySession(modelBuffer.size, this::putVertexData);
 			
 			return new VkModel.Raw(modelBuffer, modelMemory, format, vertexCount);
 		}

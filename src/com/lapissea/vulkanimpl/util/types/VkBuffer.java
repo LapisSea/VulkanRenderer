@@ -3,7 +3,9 @@ package com.lapissea.vulkanimpl.util.types;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VkMemoryRequirements;
 
 import java.nio.LongBuffer;
 
@@ -38,5 +40,9 @@ public class VkBuffer implements VkGpuCtx, VkDestroyable{
 	
 	public LongBuffer getBuff(){
 		return handle;
+	}
+	
+	public VkMemoryRequirements getMemRequirements(MemoryStack stack){
+		return gpu.getMemRequirements(stack, this);
 	}
 }
