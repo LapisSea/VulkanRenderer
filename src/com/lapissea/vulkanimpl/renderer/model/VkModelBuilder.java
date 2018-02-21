@@ -1,7 +1,5 @@
 package com.lapissea.vulkanimpl.renderer.model;
 
-import com.lapissea.util.LogUtil;
-import com.lapissea.vec.Vec3f;
 import com.lapissea.vec.interf.IVec3fR;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.format.VKFormatWriter;
@@ -132,30 +130,24 @@ public class VkModelBuilder{
 	}
 	
 	public void next(){
-		
-		for(int i=0;i<vertexData.length;i++){
-			vertexData[i]+=i+vertexCount*vertexData.length;
-		}
+		if(vertex.capacity()!=vertex.position()) throw new IllegalStateException("Vertex not finished: "+vertex.position()+" out of "+vertex.capacity()+" bytes");
 		
 		int pos=0;
 		
 		while(pos<vertexData.length){
 			byte[] chunk     =data.getLast();
-			int    toTransfer=Math.min(vertexData.length, chunk.length-dataChunkPos);
+			int    toTransfer=Math.min(vertexData.length-pos, chunk.length-dataChunkPos);
 			System.arraycopy(vertexData, pos, chunk, dataChunkPos, toTransfer);
 			dataChunkPos+=toTransfer;
 			pos+=toTransfer;
 			if(dataChunkPos==chunk.length){
 				dataChunkPos=0;
-				pos=0;
 				data.add(getDataChunk());
 			}
 		}
 		typePos=0;
 		vertex.position(0);
 		vertexCount++;
-		LogUtil.println(data);
-		LogUtil.println(dataSize(),data.size());
 	}
 	
 	public int indexCount(){
@@ -167,7 +159,7 @@ public class VkModelBuilder{
 	}
 	
 	
-	public void putVertexData(ByteBuffer dest){
+	private void putVertexData(ByteBuffer dest){
 		Iterator<byte[]> iter=data.iterator();
 		byte[]           chunk;
 		if(data.size()>1){
@@ -181,6 +173,8 @@ public class VkModelBuilder{
 	}
 	
 	public VkModel bake(VkGpu gpu){
+		if(vertex.position()!=0) throw new IllegalStateException("Vertex not finished ");
+		
 		try(MemoryStack stack=stackPush()){
 			int               dataSize  =dataSize();
 			int               indexCount=indexCount();
