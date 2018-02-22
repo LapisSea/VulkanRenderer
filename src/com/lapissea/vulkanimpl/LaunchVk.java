@@ -11,7 +11,7 @@ public class LaunchVk{
 	
 	
 	public static void main(String[] args){
-		LogUtil.__.create(true, true, "log");
+		LogUtil.__.create(true, false, "log");
 		
 		Map<String, String> parsedArgs=new HashMap<>();
 		

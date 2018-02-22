@@ -71,6 +71,7 @@ public class VulkanRenderer implements VkDestroyable{
 	public IDataManager assets;
 	
 	private VkCommandPool      graphicsPool;
+	private VkCommandPool      transferPool;
 	private VkCommandBufferM[] sceneCommandBuffers;
 	
 	private boolean surfaceBad;
@@ -110,13 +111,11 @@ public class VulkanRenderer implements VkDestroyable{
 	}
 	
 	private void initModel(){
-		VkModelFormat format=new VkModelFormat(VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT);
+		VkModelBuilder modelBuilder=new VkModelBuilder(VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT);
 		
-		VkModelBuilder modelBuilder=new VkModelBuilder(format);
-		modelBuilder.put3F(-0.5F, -0.5F, 0).put4F(1,20/256F,0,1).next();
-		modelBuilder.put3F(+0.0F, +0.5F, 0).put4F(0,20/256F,0,1).next();
-		modelBuilder.put3F(+0.5F, -0.5F, 0).put4F(0,20/256F,1,1);
-		
+		modelBuilder.put3F(-0.5F, -0.5F, 0).put4F(1, 20/256F, 0, 1).next();
+		modelBuilder.put3F(+0.0F, +0.5F, 0).put4F(0, 20/256F, 0, 1).next();
+		modelBuilder.put3F(+0.5F, -0.5F, 0).put4F(0, 20/256F, 1, 1).next();
 		
 		model=modelBuilder.bake(renderGpu);
 	}
@@ -127,6 +126,7 @@ public class VulkanRenderer implements VkDestroyable{
 		renderPass=createRenderPass();
 		shader=createGraphicsPipeline(model.getFormat());
 		graphicsPool=renderGpu.getGraphicsQueue().createCommandPool();
+		transferPool=renderGpu.getTransferQueue().createCommandPool();
 		swapchain.initFrameBuffers(renderPass);
 		initScene();
 	}
@@ -306,6 +306,7 @@ public class VulkanRenderer implements VkDestroyable{
 		forEach(sceneCommandBuffers, VkCommandBufferM::destroy);
 		shader.destroy();
 		graphicsPool.destroy();
+		transferPool.destroy();
 		renderPass.destroy();
 		swapchain.destroy();
 	}

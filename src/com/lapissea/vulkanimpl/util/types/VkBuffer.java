@@ -42,7 +42,11 @@ public class VkBuffer implements VkGpuCtx, VkDestroyable{
 		return handle;
 	}
 	
-	public VkMemoryRequirements getMemRequirements(MemoryStack stack){
-		return gpu.getMemRequirements(stack, this);
+	public VkDeviceMemory allocateBufferMemory(int requestedProperties){
+		try(VkMemoryRequirements memRequirements=VkMemoryRequirements.malloc()){
+			VkDeviceMemory mem=getGpu().allocateMemory(gpu.getMemRequirements(memRequirements, this), size, requestedProperties);
+			mem.bindBuffer(this);
+			return mem;
+		}
 	}
 }

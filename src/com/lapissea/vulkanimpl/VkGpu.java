@@ -314,9 +314,12 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	}
 	
 	public VkMemoryRequirements getMemRequirements(MemoryStack stack, VkBuffer buffer){
-		VkMemoryRequirements memRequirements=VkMemoryRequirements.mallocStack(stack);
-		vkGetBufferMemoryRequirements(getDevice(), buffer.getHandle(), memRequirements);
-		return memRequirements;
+		return getMemRequirements(VkMemoryRequirements.mallocStack(stack), buffer);
+	}
+	
+	public VkMemoryRequirements getMemRequirements(VkMemoryRequirements dest, VkBuffer buffer){
+		vkGetBufferMemoryRequirements(getDevice(), buffer.getHandle(), dest);
+		return dest;
 	}
 	
 }
