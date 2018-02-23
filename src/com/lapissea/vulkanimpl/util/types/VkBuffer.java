@@ -1,15 +1,18 @@
 package com.lapissea.vulkanimpl.util.types;
 
+import com.lapissea.vulkanimpl.SingleUseCommandBuffer;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
-import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VkBufferCopy;
+import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkMemoryRequirements;
 
 import java.nio.LongBuffer;
 
 import static org.lwjgl.system.MemoryUtil.*;
+import static org.lwjgl.vulkan.VK10.*;
 
 public class VkBuffer implements VkGpuCtx, VkDestroyable{
 	
@@ -49,4 +52,29 @@ public class VkBuffer implements VkGpuCtx, VkDestroyable{
 			return mem;
 		}
 	}
+	
+	public void copyFrom(VkBuffer src, long srcOffset, VkCommandPool transferPool){
+		copyFrom(src, srcOffset, 0, size, transferPool);
+	}
+	
+	public void copyFrom(VkBuffer src, long srcOffset, long destOffset, long size, VkCommandPool transferPool){
+		try(SingleUseCommandBuffer cmd=new SingleUseCommandBuffer(getGpu().getTransferQueue(), transferPool)){
+			copyFrom(src, srcOffset, destOffset, size, cmd.commandBuffer);
+		}
+	}
+	
+	public void copyFrom(VkBuffer src, long srcOffset, VkCommandBuffer cmd){
+		copyFrom(src, srcOffset, 0, size, cmd);
+	}
+	
+	public void copyFrom(VkBuffer src, long srcOffset, long destOffset, long size, VkCommandBuffer cmd){
+		try(VkBufferCopy.Buffer copyRegion=VkBufferCopy.calloc(1)){
+			copyRegion.get(0)
+			          .srcOffset(srcOffset)
+			          .dstOffset(destOffset)
+			          .size(size);
+			vkCmdCopyBuffer(cmd, src.getHandle(), getHandle(), copyRegion);
+		}
+	}
+	
 }

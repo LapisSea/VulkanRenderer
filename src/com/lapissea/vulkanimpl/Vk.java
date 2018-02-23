@@ -8,7 +8,6 @@ VK vkEnumeratePhysicalDevices basic optional=3,null
 
 package com.lapissea.vulkanimpl;
 
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
@@ -31,6 +30,7 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
+import static com.lapissea.vulkanimpl.util.types.VkFence.Status.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.EXTDebugReport.*;
 import static org.lwjgl.vulkan.KHRDisplaySwapchain.*;
@@ -430,7 +430,7 @@ public class Vk{
 		LongBuffer handle=memAllocLong(1);
 		int        code  =vkAllocateMemory(gpuCtx.getDevice(), allocInfo, null, handle);
 		if(DEV_ON) check(code);
-		return new VkDeviceMemory(gpuCtx.getGpu(), handle,allocInfo.allocationSize());
+		return new VkDeviceMemory(gpuCtx.getGpu(), handle, allocInfo.allocationSize());
 	}
 	
 	public static PointerBuffer mapMemory(VkDevice device, long memory, long offset, long size, int flags, PointerBuffer dest){
@@ -448,6 +448,24 @@ public class Vk{
 		int code=vkInvalidateMappedMemoryRanges(device, info);
 		if(DEV_ON) check(code);
 	}
+	
+	public static void waitForFence(VkGpuCtx ctx, long fence){
+		int code=vkWaitForFences(ctx.getDevice(), fence, true, Long.MAX_VALUE);
+		if(DEV_ON) check(code);
+	}
+	
+	public static VkFence.Status getFenceStatus(VkGpuCtx ctx, long fence){
+		int code=vkGetFenceStatus(ctx.getDevice(), fence);
+		if(DEV_ON) check(code);
+		return code==VK_NOT_READY?NOT_READY:SUCCESS;
+	}
+	
+	public static VkFence createFence(VkGpuCtx ctx, VkFenceCreateInfo info, LongBuffer dest){
+		int code=vkCreateFence(ctx.getDevice(), info, null, dest);
+		if(DEV_ON) check(code);
+		return new VkFence(ctx, dest.get(0));
+	}
+	
 	/*/START_GEN/*/
 	//lel
 	

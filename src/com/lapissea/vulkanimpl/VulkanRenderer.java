@@ -4,6 +4,7 @@ import com.lapissea.datamanager.IDataManager;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.event.change.ChangeRegistryBool;
 import com.lapissea.vec.color.ColorM;
+import com.lapissea.vec.color.IColorM;
 import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.devonly.ValidationLayers;
 import com.lapissea.vulkanimpl.devonly.VkDebugReport;
@@ -83,6 +84,7 @@ public class VulkanRenderer implements VkDestroyable{
 	}
 	
 	public void createContext(GlfwWindowVk window){
+		
 		this.window=window;
 		window.size.register(e->onWindowResize(e.getSource()));
 		
@@ -111,13 +113,15 @@ public class VulkanRenderer implements VkDestroyable{
 	}
 	
 	private void initModel(){
-		VkModelBuilder modelBuilder=new VkModelBuilder(VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT);
+		VkModelBuilder modelBuilder=new VkModelBuilder(VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_R32G32_SFLOAT);
 		
-		modelBuilder.put3F(-0.5F, -0.5F, 0).put4F(1, 20/256F, 0, 1).next();
-		modelBuilder.put3F(+0.0F, +0.5F, 0).put4F(0, 20/256F, 0, 1).next();
-		modelBuilder.put3F(+0.5F, -0.5F, 0).put4F(0, 20/256F, 1, 1).next();
-		
-		model=modelBuilder.bake(renderGpu);
+		modelBuilder.put3F(-0.5F, -0.5F, 0).put4F(IColorM.randomRGBA()).put2F(0, 0).next();
+		modelBuilder.put3F(-0.5F, +0.5F, 0).put4F(IColorM.randomRGBA()).put2F(1, 1).next();
+		modelBuilder.put3F(+0.5F, +0.5F, 0).put4F(IColorM.randomRGBA()).put2F(0, 1).next();
+		modelBuilder.put3F(+0.5F, -0.5F, 0).put4F(IColorM.randomRGBA()).put2F(0, 1).next();
+		modelBuilder.addIndices(0, 1, 2,
+		                        0, 2, 3);
+		model=modelBuilder.bake(renderGpu, transferPool);
 	}
 	
 	private void initSurfaceDependant(){
@@ -125,8 +129,6 @@ public class VulkanRenderer implements VkDestroyable{
 		swapchain=new VkSwapchain(renderGpu, surface);
 		renderPass=createRenderPass();
 		shader=createGraphicsPipeline(model.getFormat());
-		graphicsPool=renderGpu.getGraphicsQueue().createCommandPool();
-		transferPool=renderGpu.getTransferQueue().createCommandPool();
 		swapchain.initFrameBuffers(renderPass);
 		initScene();
 	}
@@ -274,6 +276,8 @@ public class VulkanRenderer implements VkDestroyable{
 
 //			if(renderGpu==computeGpu){
 			renderGpu.init(null, Vk.stringsToPP(Stream.concat(renderExtensions.stream(), computeExtensions.stream()).distinct().collect(Collectors.toList()), stack));
+			graphicsPool=renderGpu.getGraphicsQueue().createCommandPool();
+			transferPool=renderGpu.getTransferQueue().createCommandPool();
 //			}else{
 //				renderGpu.init(null, Vk.stringsToPP(renderExtensions, stack));
 //				computeGpu.init(null, Vk.stringsToPP(computeExtensions, stack));
@@ -305,8 +309,6 @@ public class VulkanRenderer implements VkDestroyable{
 	private void destroySurfaceDependant(){
 		forEach(sceneCommandBuffers, VkCommandBufferM::destroy);
 		shader.destroy();
-		graphicsPool.destroy();
-		transferPool.destroy();
 		renderPass.destroy();
 		swapchain.destroy();
 	}
@@ -319,6 +321,11 @@ public class VulkanRenderer implements VkDestroyable{
 		
 		surface.destroy();
 		
+		model.destroy();
+		
+		graphicsPool.destroy();
+		transferPool.destroy();
+		renderGpu.destroy();
 		
 		if(DEV_ON){
 			debugReport.destroy();

@@ -1,5 +1,6 @@
 package com.lapissea.vulkanimpl.renderer.model;
 
+import com.lapissea.util.LogUtil;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.types.VkBuffer;
 import com.lapissea.vulkanimpl.util.types.VkCommandBufferM;
@@ -20,7 +21,7 @@ public abstract class VkModel implements VkDestroyable{
 	}
 	
 	public enum IndexType{
-		SHORT(VK_INDEX_TYPE_UINT16, 2, (b, i)->b.put((byte)(i&0xFF)).put((byte)((i>>8)&0xFF))),
+		SHORT(VK_INDEX_TYPE_UINT16, 2, (b, i)->b.put((byte)((i>>0)&0xFF)).put((byte)((i>>8)&0xFF))),
 		INT(VK_INDEX_TYPE_UINT32, 4, ByteBuffer::putInt);
 		
 		public final int         handle;
@@ -39,20 +40,21 @@ public abstract class VkModel implements VkDestroyable{
 	public static class Indexed extends VkModel{
 		
 		private final int       indexCount;
-		private final int       dataSize;
+		private final int       indexStart;
 		private final IndexType indexType;
 		
-		public Indexed(VkBuffer buffer, VkDeviceMemory memory, VkModelFormat format, int dataSize, int indexCount, IndexType indexType){
+		public Indexed(VkBuffer buffer, VkDeviceMemory memory, VkModelFormat format, int indexCount, IndexType indexType){
 			super(buffer, memory, format);
 			this.indexCount=indexCount;
-			this.dataSize=dataSize;
+			indexStart=(int)(buffer.size-indexCount*indexType.bytes);
+			LogUtil.println(indexCount);
 			this.indexType=indexType;
 		}
 		
 		@Override
 		public void bind(VkCommandBufferM cmd){
+			vkCmdBindIndexBuffer(cmd, buffer.getHandle(), indexStart, indexType.handle);
 			vkCmdBindVertexBuffers(cmd, 0, buffer.getBuff(), ZERO_OFFSET);
-			vkCmdBindIndexBuffer(cmd, buffer.getHandle(), 0, indexType.handle);
 		}
 		
 		@Override

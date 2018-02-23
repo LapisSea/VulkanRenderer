@@ -4,10 +4,7 @@ import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 import com.lapissea.vulkanimpl.util.VkConstruct;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
-import com.lapissea.vulkanimpl.util.types.VkBuffer;
-import com.lapissea.vulkanimpl.util.types.VkCommandPool;
-import com.lapissea.vulkanimpl.util.types.VkDeviceMemory;
-import com.lapissea.vulkanimpl.util.types.VkSemaphore;
+import com.lapissea.vulkanimpl.util.types.*;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.lwjgl.PointerBuffer;
@@ -16,10 +13,12 @@ import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
 import java.nio.IntBuffer;
+import java.nio.LongBuffer;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.lwjgl.system.MemoryStack.*;
+import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkGpu implements VkDestroyable, VkGpuCtx{
@@ -52,6 +51,11 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 				        .flags(0);
 				return Vk.createCommandPool(getGpu(), poolInfo, stack.mallocLong(1));
 			}
+		}
+		
+		public Queue submit(VkSubmitInfo submitInfo, VkFence fence){
+			Vk.queueSubmit(queue, submitInfo, fence.getHandle());
+			return this;
 		}
 		
 		public Queue submit(VkSubmitInfo submitInfo){
@@ -293,8 +297,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	}
 	
 	public VkSemaphore createSemaphore(){
-		try(VkSemaphoreCreateInfo info=VkSemaphoreCreateInfo.calloc()){
-			info.sType(VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO);
+		try(VkSemaphoreCreateInfo info=VkConstruct.semaphoreCreateInfo()){
 			return Vk.createSemaphore(this, info);
 		}
 	}
@@ -320,6 +323,15 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	public VkMemoryRequirements getMemRequirements(VkMemoryRequirements dest, VkBuffer buffer){
 		vkGetBufferMemoryRequirements(getDevice(), buffer.getHandle(), dest);
 		return dest;
+	}
+	
+	public VkFence createFence(){
+		LongBuffer lb=memAllocLong(1);
+		try(VkFenceCreateInfo info=VkConstruct.fenceCreateInfo()){
+			return Vk.createFence(this, info, lb);
+		}finally{
+			memFree(lb);
+		}
 	}
 	
 }
