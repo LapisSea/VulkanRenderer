@@ -11,6 +11,7 @@ import org.lwjgl.vulkan.VkMemoryRequirements;
 
 import java.nio.LongBuffer;
 
+import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -68,6 +69,16 @@ public class VkBuffer implements VkGpuCtx, VkDestroyable{
 	}
 	
 	public void copyFrom(VkBuffer src, long srcOffset, long destOffset, long size, VkCommandBuffer cmd){
+		
+		if(DEV_ON){
+			if(srcOffset<0) throw new IndexOutOfBoundsException("Source offset can't be negative!");
+			if(destOffset<0) throw new IndexOutOfBoundsException("Destination offset can't be negative!");
+			if(size>this.size) throw new IndexOutOfBoundsException("Size has to be less or equal to destination size!");
+			if(size>src.size) throw new IndexOutOfBoundsException("Size has to be less or equal to source size!");
+			if(srcOffset+size>this.size) throw new IndexOutOfBoundsException("Destination range of "+srcOffset+" - "+(srcOffset+size)+" is out of range!");
+			if(srcOffset+size>src.size) throw new IndexOutOfBoundsException("Source range of "+srcOffset+" - "+(srcOffset+size)+" is out of range!");
+		}
+		
 		try(VkBufferCopy.Buffer copyRegion=VkBufferCopy.calloc(1)){
 			copyRegion.get(0)
 			          .srcOffset(srcOffset)

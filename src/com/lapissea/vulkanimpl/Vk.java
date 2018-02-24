@@ -466,6 +466,24 @@ public class Vk{
 		return new VkFence(ctx, dest.get(0));
 	}
 	
+	public static VkDescriptorSetLayout createDescriptorSetLayout(VkGpuCtx ctx, VkDescriptorSetLayoutCreateInfo info, LongBuffer dest){
+		int code=vkCreateDescriptorSetLayout(ctx.getDevice(), info, null, dest);
+		if(DEV_ON) check(code);
+		return new VkDescriptorSetLayout(dest.get(0), ctx.getGpu());
+	}
+	
+	public static long createDescriptorPool(VkGpuCtx ctx, VkDescriptorPoolCreateInfo info, LongBuffer dest){
+		int code=vkCreateDescriptorPool(ctx.getDevice(), info, null, dest);
+		if(DEV_ON) check(code);
+		return dest.get(0);
+	}
+	
+	public static long allocateDescriptorSets(VkGpuCtx ctx, VkDescriptorSetAllocateInfo info, LongBuffer dest){
+		int code=vkAllocateDescriptorSets(ctx.getDevice(), info, dest);
+		if(DEV_ON) check(code);
+		return dest.get(0);
+	}
+	
 	/*/START_GEN/*/
 	//lel
 	

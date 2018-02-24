@@ -2,8 +2,7 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 layout(location = 0) out vec4 out_color;
-layout(location = 1) out vec2 out_uv;
-layout(location = 2) out float angle;
+layout(location = 2) out vec2 out_pos;
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -11,12 +10,14 @@ out gl_PerVertex {
 
 layout(location = 0) in vec3 pos;
 layout(location = 1) in vec4 color;
-layout(location = 2) in vec2 uv;
 
+
+layout(binding = 0) uniform UniformBufferObject{
+	mat4 mat;
+} ubo;
 
 void main() {
-    gl_Position = vec4(pos, 1.0);
+    gl_Position = vec4(pos, 1.0)+vec4(pos, 1.0)*ubo.mat;
     out_color = color;
-    out_uv=uv;
-    angle=atan((pos.x+0.5),-(pos.y+0.5));
+    out_pos=pos.xy;
 }

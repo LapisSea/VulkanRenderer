@@ -1,6 +1,5 @@
 package com.lapissea.vulkanimpl.renderer.model;
 
-import com.lapissea.util.LogUtil;
 import com.lapissea.vec.color.IColorM;
 import com.lapissea.vec.interf.IVec3fR;
 import com.lapissea.vulkanimpl.VkGpu;
@@ -19,12 +18,13 @@ import java.util.LinkedList;
 import java.util.List;
 
 import static com.lapissea.vulkanimpl.renderer.model.VkModel.IndexType.*;
+import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkModelBuilder{
 	
 	private static final int DATA_CHUNK_SIZE =1<<6;
-	private static final int INDEX_CHUNK_SIZE=1<<6;
+	private static final int INDEX_CHUNK_SIZE=1<<5;
 	
 	private static final LinkedList<SoftReference<byte[]>> DATA_CACHE =new LinkedList<>();
 	private static final LinkedList<SoftReference<int[]>>  INDEX_CACHE=new LinkedList<>();
@@ -186,77 +186,48 @@ public class VkModelBuilder{
 	}
 	
 	public long dataSize(){
-		return (data.size()-1L)*INDEX_CHUNK_SIZE+dataChunkPos;
+		return (data.size()-1L)*DATA_CHUNK_SIZE+dataChunkPos;
 	}
 	
 	
 	public VkModel bake(VkGpu gpu, VkCommandPool transferPool){
 		if(vertex.position()!=0) throw new IllegalStateException("Vertex not finished ");
 		
-		long          vertexSize=dataSize();
-		long          indexCount=indexCount();
-		final boolean indexed   =indexCount>0;
-		IndexType     indexType;
-		long          indexSize;
-		long          totalSize;
+		
+		long      vertexSize=dataSize();
+		long      indexCount=indexCount();
+		boolean   indexed   =indexCount>0;
+		IndexType indexType;
+		int       indexStart;
+		long      totalSize;
 		
 		if(indexed){
 			indexType=indexCount<1<<16?SHORT:INT;
-			indexSize=indexCount*indexType.bytes;
-			
-			totalSize=vertexSize+indexSize;
+			totalSize=vertexSize+indexCount*indexType.bytes;
 		}else{
-			totalSize=vertexSize;
 			indexType=null;
+			totalSize=vertexSize;
 		}
 		
 		VkBuffer       stagingBuffer=gpu.createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, totalSize);
 		VkDeviceMemory stagingMemory=stagingBuffer.allocateBufferMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		
-		stagingMemory.memorySession(stagingBuffer.size, mem->{
-			{
-				Iterator<byte[]> iter=data.iterator();
-				byte[]           chunk;
-				if(data.size()>1){
-					for(int i=0, j=data.size()-1;i<j;i++){
-						mem.put(chunk=iter.next());
-						DATA_CACHE.add(new SoftReference<>(chunk));
-					}
-				}
-				mem.put(chunk=iter.next(), 0, dataChunkPos);
-				DATA_CACHE.add(new SoftReference<>(chunk));
-				data.clear();
-			}
-			LogUtil.println(mem);
+		try(VkDeviceMemory.MemorySession ses=stagingMemory.memorySession(stagingBuffer.size)){
+			ByteBuffer mem=ses.memory;
+			writeVertex(mem);
 			
 			if(indexed){
-				Iterator<int[]> iter=indices.iterator();
-				int[]           chunk;
-				if(indices.size()>1){
-					for(int i=0, j=indices.size()-1;i<j;i++){
-						chunk=iter.next();
-						for(int k=0;k<INDEX_CHUNK_SIZE;k++){
-							indexType.indexWriter.write(mem, chunk[k]);
-						}
-						INDEX_CACHE.add(new SoftReference<>(chunk));
-					}
-				}
-				chunk=iter.next();
-				for(int k=0;k<indexChunkPos;k++){
-					indexType.indexWriter.write(mem, chunk[k]);
-				}
-				INDEX_CACHE.add(new SoftReference<>(chunk));
-				indices.clear();
-			}
-			LogUtil.println(mem);
-			stagingMemory.flushRanges(stagingBuffer.size);
-			stagingMemory.invalidateRanges(stagingBuffer.size);
-		});
+				indexStart=mem.position();
+				writeIndex(mem, indexType);
+			}else indexStart=-1;
+			
+			stagingMemory.flushRanges();
+			stagingMemory.invalidateRanges();
+		}
 		
 		int usage=VK_BUFFER_USAGE_TRANSFER_DST_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 		if(indexed) usage|=VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 		
-		VkBuffer       modelBuffer=gpu.createBuffer(usage, vertexSize);
+		VkBuffer       modelBuffer=gpu.createBuffer(usage, totalSize);
 		VkDeviceMemory modelMemory=modelBuffer.allocateBufferMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		
 		modelBuffer.copyFrom(stagingBuffer, 0, transferPool);
@@ -264,9 +235,52 @@ public class VkModelBuilder{
 		stagingBuffer.destroy();
 		stagingMemory.destroy();
 		
-		LogUtil.println(indexCount);
-		if(indexed) return new VkModel.Indexed(modelBuffer, modelMemory, format, (int)indexCount, indexType);
+		gpu.waitIdle();
+		
+		
+		if(indexed) return new VkModel.Indexed(modelBuffer, modelMemory, format, indexStart, (int)indexCount, indexType);
 		return new VkModel.Raw(modelBuffer, modelMemory, format, vertexCount);
+	}
+	
+	private void writeVertex(ByteBuffer mem){
+		
+		Iterator<byte[]> iter=data.iterator();
+		if(data.size()>1){
+			for(int i=0, j=data.size()-1;i<j;i++){
+				mem.put(iter.next());
+			}
+		}
+		mem.put(iter.next(), 0, dataChunkPos);
+		
+		data.stream().map(SoftReference::new).forEach(DATA_CACHE::add);
+		data.clear();
+	}
+	
+	private void writeIndex(ByteBuffer mem, IndexType indexType){
+		Iterator<int[]> iter=indices.iterator();
+		if(indices.size()>1){
+			for(int i=0, j=indices.size()-1;i<j;i++){
+				int[] chunk=iter.next();
+				for(int k=0;k<INDEX_CHUNK_SIZE;k++){
+					if(DEV_ON){
+						if(chunk[k]<0) throw new IndexOutOfBoundsException("Index must be positive!");
+						if(chunk[k]>=vertexCount) throw new IndexOutOfBoundsException("Index must be less than "+vertexCount+"!");
+					}
+					indexType.indexWriter.write(mem, chunk[k]);
+				}
+				
+			}
+		}
+		int[] chunk=iter.next();
+		for(int k=0;k<indexChunkPos;k++){
+			if(DEV_ON){
+				if(chunk[k]<0) throw new IndexOutOfBoundsException("Index must be positive!");
+				if(chunk[k]>=vertexCount) throw new IndexOutOfBoundsException("Index must be less than "+vertexCount+"!");
+			}
+			indexType.indexWriter.write(mem, chunk[k]);
+		}
+		indices.stream().map(SoftReference::new).forEach(INDEX_CACHE::add);
+		indices.clear();
 	}
 	
 }

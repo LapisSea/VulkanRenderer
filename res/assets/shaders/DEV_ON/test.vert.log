@@ -1,3 +1,4 @@
-C:\Programming\Java\FastFolderUtil\VulkanRender\res\assets\shaders\test.vert:20: 'assign' :  cannot convert from ' global highp 2-component vector of float' to 'layout( location=2) smooth out highp float'
-C:\Programming\Java\FastFolderUtil\VulkanRender\res\assets\shaders\test.vert:20: '' : compilation terminated 
+C:\Programming\Java\FastFolderUtil\VulkanRender\res\assets\shaders\test.vert:17: 'non-opaque uniforms outside a block' : not allowed when using GLSL for Vulkan 
+C:\Programming\Java\FastFolderUtil\VulkanRender\res\assets\shaders\test.vert:17: 'binding' : requires block, or sampler/image, or atomic-counter type 
 2 compilation errors.  No code generated.
+Linking vertex stage: Missing entry point: Each stage requires one entry point

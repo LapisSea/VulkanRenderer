@@ -5,6 +5,7 @@ import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.renderer.model.VkModelFormat;
 import com.lapissea.vulkanimpl.shaders.states.VkBlendMode;
 import com.lapissea.vulkanimpl.shaders.states.VkDrawMode;
+import com.lapissea.vulkanimpl.util.types.VkDescriptorSetLayout;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 

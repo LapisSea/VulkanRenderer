@@ -17,12 +17,12 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkGraphicsPipelineCreateInfo;
 import org.lwjgl.vulkan.VkPipelineLayoutCreateInfo;
 import org.lwjgl.vulkan.VkPipelineShaderStageCreateInfo;
-import org.lwjgl.vulkan.VkPipelineVertexInputStateCreateInfo;
 
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.LongBuffer;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -76,7 +76,7 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 		this.surface=surface;
 	}
 	
-	public VkShader init(ShaderState state, VkRenderPass renderPass){
+	public VkShader init(ShaderState state, VkRenderPass renderPass, LongBuffer setLayouts){
 		if(DevelopmentInfo.DEV_ON){
 			
 			BiConsumer<String, String> winComp=(fileName, type)->{
@@ -99,7 +99,7 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 			
 			VkPipelineLayoutCreateInfo pipelineLayoutInfo=VkPipelineLayoutCreateInfo.callocStack(stack);
 			pipelineLayoutInfo.sType(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
-			                  .pSetLayouts(null)
+			                  .pSetLayouts(setLayouts)
 			                  .pPushConstantRanges(null);
 			
 			pipelineLayout=Vk.createPipelineLayout(gpu, pipelineLayoutInfo, stack.mallocLong(1));
@@ -118,7 +118,7 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 			            .renderPass(renderPass.getHandle())
 			            .basePipelineHandle(VK_NULL_HANDLE)
 			            .basePipelineIndex(-1);
-			state.write(stack,pipelineInfo.get(0));
+			state.write(stack, pipelineInfo.get(0));
 			
 			
 			pipeline=Vk.createGraphicsPipelines(gpu, 0, pipelineInfo, stack.mallocLong(1));
@@ -171,6 +171,11 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 	public void bind(VkCommandBufferM cmd){
 		vkCmdBindPipeline(cmd, isCompute()?VK_PIPELINE_BIND_POINT_COMPUTE:VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 	}
+	
+	public void bindDescriptorSets(VkCommandBufferM cmd, LongBuffer descriptorSet){
+		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, descriptorSet, null);
+	}
+	
 	
 	@Override
 	public void destroy(){

@@ -51,4 +51,27 @@ public class VkConstruct{
 		return VkFenceCreateInfo.calloc().sType(VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
 	}
 	
+	public static VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo(){
+		return VkDescriptorSetLayoutCreateInfo.calloc().sType(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
+	}
+	
+	public static VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo(MemoryStack stack){
+		return VkDescriptorSetLayoutCreateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
+	}
+	
+	public static VkDescriptorPoolCreateInfo descriptorPoolCreateInfo(MemoryStack stack){
+		return VkDescriptorPoolCreateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO);
+	}
+	
+	public static VkDescriptorSetAllocateInfo descriptorSetAllocateInfo(MemoryStack stack){
+		return VkDescriptorSetAllocateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO);
+	}
+	
+	public static VkWriteDescriptorSet.Buffer writeDescriptorSet(int count, MemoryStack stack){
+		VkWriteDescriptorSet.Buffer buff=VkWriteDescriptorSet.callocStack(count, stack);
+		for(int i=0;i<count;i++){
+			buff.get(i).sType(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET);
+		}
+		return buff;
+	}
 }

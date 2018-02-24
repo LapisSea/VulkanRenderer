@@ -21,7 +21,7 @@ public abstract class VkModel implements VkDestroyable{
 	}
 	
 	public enum IndexType{
-		SHORT(VK_INDEX_TYPE_UINT16, 2, (b, i)->b.put((byte)((i>>0)&0xFF)).put((byte)((i>>8)&0xFF))),
+		SHORT(VK_INDEX_TYPE_UINT16, 2, (b, i)->b.putShort((short)i)),
 		INT(VK_INDEX_TYPE_UINT32, 4, ByteBuffer::putInt);
 		
 		public final int         handle;
@@ -43,18 +43,18 @@ public abstract class VkModel implements VkDestroyable{
 		private final int       indexStart;
 		private final IndexType indexType;
 		
-		public Indexed(VkBuffer buffer, VkDeviceMemory memory, VkModelFormat format, int indexCount, IndexType indexType){
+		public Indexed(VkBuffer buffer, VkDeviceMemory memory, VkModelFormat format, int indexStart, int indexCount, IndexType indexType){
 			super(buffer, memory, format);
 			this.indexCount=indexCount;
-			indexStart=(int)(buffer.size-indexCount*indexType.bytes);
-			LogUtil.println(indexCount);
+//			this.indexStart=(int)(buffer.size-indexCount*indexType.bytes);
+			this.indexStart=indexStart;
 			this.indexType=indexType;
 		}
 		
 		@Override
 		public void bind(VkCommandBufferM cmd){
-			vkCmdBindIndexBuffer(cmd, buffer.getHandle(), indexStart, indexType.handle);
 			vkCmdBindVertexBuffers(cmd, 0, buffer.getBuff(), ZERO_OFFSET);
+			vkCmdBindIndexBuffer(cmd, buffer.getHandle(), indexStart, indexType.handle);
 		}
 		
 		@Override

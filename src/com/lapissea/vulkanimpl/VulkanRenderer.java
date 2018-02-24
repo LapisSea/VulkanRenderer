@@ -17,10 +17,8 @@ import com.lapissea.vulkanimpl.shaders.VkShader;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import com.lapissea.vulkanimpl.util.VkConstruct;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
-import com.lapissea.vulkanimpl.util.types.VkCommandBufferM;
-import com.lapissea.vulkanimpl.util.types.VkCommandPool;
-import com.lapissea.vulkanimpl.util.types.VkRenderPass;
-import com.lapissea.vulkanimpl.util.types.VkSurface;
+import com.lapissea.vulkanimpl.util.types.*;
+import org.joml.Matrix4f;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
@@ -77,7 +75,13 @@ public class VulkanRenderer implements VkDestroyable{
 	
 	private boolean surfaceBad;
 	
-	private VkModel model;
+	private VkModel        model;
+	private VkBuffer       uniformBuffer;
+	private VkDeviceMemory uniformMemory;
+	
+	private VkDescriptorSetLayout uniformLayout;
+	private long                  descriptorPool;
+	private long                  descriptorSet;
 	
 	public VulkanRenderer(IDataManager assets){
 		this.assets=assets;
@@ -108,19 +112,72 @@ public class VulkanRenderer implements VkDestroyable{
 		
 		surface=window.createSurface(this);
 		intGpus();
+		initUniform();
 		initModel();
 		initSurfaceDependant();
 	}
 	
+	private void initUniform(){
+		try(MemoryStack stack=stackPush()){
+			VkDescriptorPoolSize.Buffer poolSize=VkDescriptorPoolSize.callocStack(1);
+			poolSize.get(0)
+			        .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+			        .descriptorCount(1);
+			
+			VkDescriptorPoolCreateInfo poolInfo=VkConstruct.descriptorPoolCreateInfo(stack);
+			poolInfo.pPoolSizes(poolSize)
+			        .maxSets(1);
+			descriptorPool=Vk.createDescriptorPool(renderGpu, poolInfo, stack.mallocLong(1));
+			
+			
+			uniformLayout=renderGpu.createDescriptorSetLayout(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
+			uniformBuffer=renderGpu.createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, Float.SIZE*16/Byte.SIZE);
+			uniformMemory=uniformBuffer.allocateBufferMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			
+			
+			VkDescriptorSetAllocateInfo allocInfo=VkConstruct.descriptorSetAllocateInfo(stack);
+			allocInfo.descriptorPool(descriptorPool);
+			allocInfo.pSetLayouts(stack.longs(uniformLayout.getHandle()));
+			descriptorSet=Vk.allocateDescriptorSets(renderGpu, allocInfo, stack.callocLong(1));
+			
+			VkDescriptorBufferInfo.Buffer bufferInfo=VkDescriptorBufferInfo.callocStack(1, stack);
+			bufferInfo.get(0)
+			          .buffer(uniformBuffer.getHandle())
+			          .offset(0)
+			          .range(uniformBuffer.size);
+			
+			VkWriteDescriptorSet.Buffer descriptorWrite=VkWriteDescriptorSet.callocStack(1, stack);
+			descriptorWrite.get(0)
+			               .sType(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET)
+			               .dstSet(descriptorSet)
+			               .descriptorType(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+			               .pBufferInfo(bufferInfo)
+			               .dstBinding(0)
+			               .dstArrayElement(0);
+			
+			vkUpdateDescriptorSets(renderGpu.getDevice(), descriptorWrite, null);
+		}
+	}
+	
+	private void updateUniforms(){
+		Matrix4f mat=new Matrix4f();
+		mat.rotate((float)((System.currentTimeMillis()/1000D)%(Math.PI*2)), 0, 0, 1);
+		uniformMemory.memorySession(uniformBuffer.size, mat::set);
+	}
+	
 	private void initModel(){
-		VkModelBuilder modelBuilder=new VkModelBuilder(VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_R32G32_SFLOAT);
+		VkModelBuilder modelBuilder=new VkModelBuilder(VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT);
 		
-		modelBuilder.put3F(-0.5F, -0.5F, 0).put4F(IColorM.randomRGBA()).put2F(0, 0).next();
-		modelBuilder.put3F(-0.5F, +0.5F, 0).put4F(IColorM.randomRGBA()).put2F(1, 1).next();
-		modelBuilder.put3F(+0.5F, +0.5F, 0).put4F(IColorM.randomRGBA()).put2F(0, 1).next();
-		modelBuilder.put3F(+0.5F, -0.5F, 0).put4F(IColorM.randomRGBA()).put2F(0, 1).next();
-		modelBuilder.addIndices(0, 1, 2,
-		                        0, 2, 3);
+		modelBuilder.put3F(-0.5F, -0.5F, 0).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(-0.5F, +0.5F, 0).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, +0.5F, 0).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, -0.5F, 0).put4F(IColorM.randomRGBA()).next();
+		
+		modelBuilder.addIndices(
+			0, 1, 2,
+			0, 2, 3
+		                       );
+		
 		model=modelBuilder.bake(renderGpu, transferPool);
 	}
 	
@@ -142,7 +199,11 @@ public class VulkanRenderer implements VkDestroyable{
 			sceneBuffer.begin();
 			renderPass.begin(sceneBuffer, frame.getFrameBuffer(), surface.getSize(), new ColorM(0, 0, 0, 0));
 			
+			
 			shader.bind(sceneBuffer);
+			try(MemoryStack stack=stackPush()){
+				shader.bindDescriptorSets(sceneBuffer, stack.longs(descriptorSet));
+			}
 			
 			model.bind(sceneBuffer);
 			model.render(sceneBuffer);
@@ -288,9 +349,12 @@ public class VulkanRenderer implements VkDestroyable{
 	private VkShader createGraphicsPipeline(VkModelFormat format){
 		VkShader    shader=new VkShader(assets.subData("assets/shaders"), "test", getRenderGpu(), surface);
 		ShaderState state =new ShaderState();
+		
 		state.setViewport(window.size);
 		state.setInput(new VkPipelineInput(format));
-		shader.init(state, renderPass);
+		try(MemoryStack stack=stackPush()){
+			shader.init(state, renderPass, stack.longs(uniformLayout.getHandle()));
+		}
 		
 		return shader;
 	}
@@ -323,6 +387,10 @@ public class VulkanRenderer implements VkDestroyable{
 		
 		model.destroy();
 		
+		uniformLayout.destroy();
+		uniformBuffer.destroy();
+		uniformMemory.destroy();
+		
 		graphicsPool.destroy();
 		transferPool.destroy();
 		renderGpu.destroy();
@@ -338,6 +406,7 @@ public class VulkanRenderer implements VkDestroyable{
 		
 		if(surfaceBad) recreateSurface();
 		
+		
 		try(MemoryStack stack=stackPush()){
 			
 			VkSwapchain.Frame frame=swapchain.acquireNextFrame();
@@ -345,6 +414,8 @@ public class VulkanRenderer implements VkDestroyable{
 				recreateSurface();
 				frame=swapchain.acquireNextFrame();
 			}
+			
+			updateUniforms();
 			
 			LongBuffer imgAviable  =swapchain.getImageAviable().getBuffer();
 			LongBuffer renderFinish=frame.getRenderFinish().getBuffer();

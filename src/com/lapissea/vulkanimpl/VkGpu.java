@@ -334,4 +334,26 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		}
 	}
 	
+	public VkDescriptorSetLayout createDescriptorSetLayout(int type, int stage, int... repeat){
+		try(MemoryStack stack=stackPush()){
+			int                                 repeatCount     =repeat.length/2;
+			VkDescriptorSetLayoutBinding.Buffer uboLayoutBinding=VkDescriptorSetLayoutBinding.calloc(1+repeatCount);
+			VkDescriptorSetLayoutCreateInfo     layoutInfo      =VkConstruct.descriptorSetLayoutCreateInfo(stack);
+			uboLayoutBinding.get(0)
+			                .binding(0)
+			                .descriptorType(type)
+			                .descriptorCount(1)
+			                .stageFlags(stage);
+			for(int i=0;i<repeatCount;i++){
+				uboLayoutBinding.get(i+1)
+				                .binding(i+1)
+				                .descriptorType(repeat[i*2])
+				                .descriptorCount(1)
+				                .stageFlags(repeat[i*2+1]);
+			}
+			layoutInfo.pBindings(uboLayoutBinding);
+			return Vk.createDescriptorSetLayout(this, layoutInfo, stack.mallocLong(1));
+		}
+	}
+	
 }
