@@ -29,6 +29,7 @@ public class LaunchVk{
 	}
 	
 	private static void sysProps(Map<String, String> parsedArgs){
+		System.getProperty("joml.nounsafe", "true");
 		System.setProperty("VulkanRenderer.devMode", parsedArgs.get("dev"));
 	}
 	

@@ -117,7 +117,7 @@ public class VkDeviceMemory implements VkGpuCtx, VkDestroyable{
 	
 	public void memorySession(PointerBuffer pointer, long offset, long byteSize, Consumer<ByteBuffer> memoryConsumer){
 		try{
-			memoryConsumer.accept(map(offset, byteSize, pointer).getByteBuffer((int)byteSize));
+			memoryConsumer.accept(map(offset, byteSize, pointer).getByteBuffer((int)byteSize).order(ByteOrder.nativeOrder()));
 		}finally{
 			unmap();
 		}

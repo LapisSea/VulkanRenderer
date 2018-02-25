@@ -13,11 +13,13 @@ layout(location = 1) in vec4 color;
 
 
 layout(binding = 0) uniform UniformBufferObject{
-	mat4 mat;
+	mat4 model;
+	mat4 view;
+	mat4 projection;
 } ubo;
 
 void main() {
-    gl_Position = vec4(pos, 1.0)+vec4(pos, 1.0)*ubo.mat;
+    gl_Position= (ubo.projection* (ubo.view * (ubo.model * vec4(pos, 1.0))));
     out_color = color;
     out_pos=pos.xy;
 }

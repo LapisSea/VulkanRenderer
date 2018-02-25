@@ -1,6 +1,7 @@
 package com.lapissea.vulkanimpl;
 
 import com.lapissea.datamanager.IDataManager;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.event.change.ChangeRegistryBool;
 import com.lapissea.vec.color.ColorM;
@@ -23,6 +24,8 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,6 +39,7 @@ import static com.lapissea.vulkanimpl.devonly.VkDebugReport.Type.*;
 import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryStack.*;
+import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.EXTDebugReport.*;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
@@ -119,6 +123,13 @@ public class VulkanRenderer implements VkDestroyable{
 	
 	private void initUniform(){
 		try(MemoryStack stack=stackPush()){
+			int floatSize=Float.SIZE/Byte.SIZE;
+			int matrixSize=floatSize*16;
+			uniformLayout=renderGpu.createDescriptorSetLayout(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
+			uniformBuffer=renderGpu.createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, matrixSize*3);
+			uniformMemory=uniformBuffer.allocateBufferMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			
+			
 			VkDescriptorPoolSize.Buffer poolSize=VkDescriptorPoolSize.callocStack(1);
 			poolSize.get(0)
 			        .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
@@ -128,12 +139,6 @@ public class VulkanRenderer implements VkDestroyable{
 			poolInfo.pPoolSizes(poolSize)
 			        .maxSets(1);
 			descriptorPool=Vk.createDescriptorPool(renderGpu, poolInfo, stack.mallocLong(1));
-			
-			
-			uniformLayout=renderGpu.createDescriptorSetLayout(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
-			uniformBuffer=renderGpu.createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, Float.SIZE*16/Byte.SIZE);
-			uniformMemory=uniformBuffer.allocateBufferMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-			
 			
 			VkDescriptorSetAllocateInfo allocInfo=VkConstruct.descriptorSetAllocateInfo(stack);
 			allocInfo.descriptorPool(descriptorPool);
@@ -159,19 +164,39 @@ public class VulkanRenderer implements VkDestroyable{
 		}
 	}
 	
-	private void updateUniforms(){
-		Matrix4f mat=new Matrix4f();
-		mat.rotate((float)((System.currentTimeMillis()/1000D)%(Math.PI*2)), 0, 0, 1);
-		uniformMemory.memorySession(uniformBuffer.size, mat::set);
+	private void updateUniforms(ByteBuffer uniforms){
+		Matrix4f model     =new Matrix4f();
+		Matrix4f view      =new Matrix4f();
+		Matrix4f projection=new Matrix4f();
+		
+		model.scale(0.5F)
+		     .translate(0, 0, 0.5F)
+		     .rotate(0.6F,1,0,0)
+		     .rotate((float)((System.currentTimeMillis()/500D)%(Math.PI*2)), 0, 0, 1)
+		     .translate(0, 0, -0.5F);
+
+//		projection.rotate(0.1f,1,0,0);
+		float aspect=(float)window.size.x()/(float)window.size.y();
+//		projection.scale(1/aspect,1,1);
+		projection.perspective((float) Math.toRadians(45.0f), aspect, 0f, 100f, true);
+		view.lookAt(0F, 0F, 0F,
+		            0, 0F, -1,
+		            0, 1, 0);
+		
+		int matrixSize=Float.SIZE*16/Byte.SIZE;
+		model.get(0, uniforms);
+		view.get(matrixSize, uniforms);
+		projection.get(matrixSize*2, uniforms);
+		
 	}
 	
 	private void initModel(){
 		VkModelBuilder modelBuilder=new VkModelBuilder(VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT);
 		
-		modelBuilder.put3F(-0.5F, -0.5F, 0).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(-0.5F, +0.5F, 0).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(+0.5F, +0.5F, 0).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(+0.5F, -0.5F, 0).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(-0.5F, -0.5F, 0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(-0.5F, +0.5F, 0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, +0.5F, 0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, -0.5F, 0.5F).put4F(IColorM.randomRGBA()).next();
 		
 		modelBuilder.addIndices(
 			0, 1, 2,
@@ -391,6 +416,8 @@ public class VulkanRenderer implements VkDestroyable{
 		uniformBuffer.destroy();
 		uniformMemory.destroy();
 		
+		vkDestroyDescriptorPool(renderGpu.getDevice(), descriptorPool, null);
+		
 		graphicsPool.destroy();
 		transferPool.destroy();
 		renderGpu.destroy();
@@ -401,48 +428,48 @@ public class VulkanRenderer implements VkDestroyable{
 		vkDestroyInstance(instance, null);
 	}
 	
+	IntBuffer        waitDstStageMask    =memAllocInt(1).put(0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+	IntBuffer        imageIndex          =memAllocInt(1);
+	PointerBuffer    commandBuffers      =memAllocPointer(1);
+	VkSubmitInfo     mainRenderSubmitInfo=VkSubmitInfo.calloc()
+	                                                  .sType(VK_STRUCTURE_TYPE_SUBMIT_INFO)
+	                                                  .pWaitDstStageMask(waitDstStageMask)
+	                                                  .pCommandBuffers(commandBuffers);
+	VkPresentInfoKHR presentInfo         =VkPresentInfoKHR.calloc()
+	                                                      .sType(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR)
+	                                                      .pImageIndices(imageIndex);
+	
 	public void render(){
-		if(window.isHidden()) return;
 		
 		if(surfaceBad) recreateSurface();
 		
+		uniformMemory.memorySession(uniformBuffer.size, this::updateUniforms);
 		
-		try(MemoryStack stack=stackPush()){
-			
-			VkSwapchain.Frame frame=swapchain.acquireNextFrame();
-			if(frame==null){
-				recreateSurface();
-				frame=swapchain.acquireNextFrame();
-			}
-			
-			updateUniforms();
-			
-			LongBuffer imgAviable  =swapchain.getImageAviable().getBuffer();
-			LongBuffer renderFinish=frame.getRenderFinish().getBuffer();
-			LongBuffer swapchains  =swapchain.getBuffer();
-			
-			VkSubmitInfo mainRenderSubmitInfo=VkSubmitInfo.callocStack(stack);
-			mainRenderSubmitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO)
-			                    .pWaitSemaphores(imgAviable)
-			                    .waitSemaphoreCount(imgAviable.limit())
-			                    .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT))
-			                    .pSignalSemaphores(renderFinish)
-			                    .pCommandBuffers(stack.pointers(sceneCommandBuffers));
-			
-			renderGpu.getGraphicsQueue().submit(mainRenderSubmitInfo);
-			
-			//push rendered image to screen
-			VkPresentInfoKHR presentInfo=VkPresentInfoKHR.callocStack(stack);
-			presentInfo.sType(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR)
-			           .pWaitSemaphores(renderFinish)
-			           .pSwapchains(swapchains)
-			           .swapchainCount(swapchains.limit())
-			           .pImageIndices(stack.ints(frame.index));
-			
-			if(renderGpu.getSurfaceQueue().present(presentInfo)){
-				surfaceBad=true;
-			}
-			
+		VkSwapchain.Frame frame=swapchain.acquireNextFrame();
+		if(frame==null){
+			recreateSurface();
+			frame=swapchain.acquireNextFrame();
+		}
+		
+		LongBuffer imgAviable  =swapchain.getImageAviable().getBuffer();
+		LongBuffer renderFinish=frame.getRenderFinish().getBuffer();
+		LongBuffer swapchains  =swapchain.getBuffer();
+		
+		commandBuffers.put(0, sceneCommandBuffers[frame.index]);
+		mainRenderSubmitInfo.pWaitSemaphores(imgAviable)
+		                    .waitSemaphoreCount(imgAviable.limit())
+		                    .pSignalSemaphores(renderFinish);
+		
+		imageIndex.put(0, frame.index);
+		presentInfo.pWaitSemaphores(renderFinish)
+		           .pSwapchains(swapchains)
+		           .swapchainCount(swapchains.limit());
+		
+		renderGpu.getGraphicsQueue().submit(mainRenderSubmitInfo);
+		
+		
+		if(renderGpu.getSurfaceQueue().present(presentInfo)){
+			surfaceBad=true;
 		}
 	}
 	

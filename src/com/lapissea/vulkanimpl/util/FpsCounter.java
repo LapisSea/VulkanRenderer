@@ -1,5 +1,6 @@
 package com.lapissea.vulkanimpl.util;
 
+import com.lapissea.util.LogUtil;
 import gnu.trove.iterator.TLongIterator;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TLongArrayList;
@@ -28,7 +29,6 @@ public class FpsCounter{
 		if(!active) return;
 		
 		long time=tim.getAsLong();
-		
 		TLongIterator i=frames.iterator();
 		while(i.hasNext()){
 			if(time-i.next()>second) i.remove();

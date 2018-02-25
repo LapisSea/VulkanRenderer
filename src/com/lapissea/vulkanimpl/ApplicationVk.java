@@ -131,19 +131,19 @@ public class ApplicationVk{
 	}
 	
 	private void render(){
-		if(gameWindow.isHidden()){
+		if(!gameWindow.isVisible()){
 			UtilL.sleep(1);
 			return;
 		}
 		
 		vkRenderer.render();
-		fps.newFrame();
-		
-		long tim=System.currentTimeMillis();
-		if(lastFpsPrint+1000<tim){
-			lastFpsPrint=tim;
-			LogUtil.println(fps);
-		}
+//		fps.newFrame();
+//
+//		long tim=System.currentTimeMillis();
+//		if(lastFpsPrint+250<tim){
+//			lastFpsPrint=tim;
+//			LogUtil.println(fps);
+//		}
 	}
 	
 	public void destroy(){
