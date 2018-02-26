@@ -1,7 +1,6 @@
 package com.lapissea.vulkanimpl;
 
 import com.lapissea.datamanager.IDataManager;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.event.change.ChangeRegistryBool;
 import com.lapissea.vec.color.ColorM;
@@ -25,6 +24,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
 import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.ArrayList;
@@ -123,10 +123,10 @@ public class VulkanRenderer implements VkDestroyable{
 	
 	private void initUniform(){
 		try(MemoryStack stack=stackPush()){
-			int floatSize=Float.SIZE/Byte.SIZE;
+			int floatSize =Float.SIZE/Byte.SIZE;
 			int matrixSize=floatSize*16;
 			uniformLayout=renderGpu.createDescriptorSetLayout(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
-			uniformBuffer=renderGpu.createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, matrixSize*3);
+			uniformBuffer=renderGpu.createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, matrixSize*3+floatSize);
 			uniformMemory=uniformBuffer.allocateBufferMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			
 			
@@ -169,38 +169,42 @@ public class VulkanRenderer implements VkDestroyable{
 		Matrix4f view      =new Matrix4f();
 		Matrix4f projection=new Matrix4f();
 		
-		model.scale(0.5F)
-		     .translate(0, 0, 0.5F)
-		     .rotate(0.6F,1,0,0)
-		     .rotate((float)((System.currentTimeMillis()/500D)%(Math.PI*2)), 0, 0, 1)
-		     .translate(0, 0, -0.5F);
-
+		model.rotate((float)((System.currentTimeMillis()/500D)%(Math.PI*2)),0,1,1).scale(1F);
 //		projection.rotate(0.1f,1,0,0);
 		float aspect=(float)window.size.x()/(float)window.size.y();
 //		projection.scale(1/aspect,1,1);
-		projection.perspective((float) Math.toRadians(45.0f), aspect, 0f, 100f, true);
-		view.lookAt(0F, 0F, 0F,
-		            0, 0F, -1,
-		            0, 1, 0);
+//		projection.perspective((float) Math.toRadians(45.0f), aspect, 0f, 100f, false);
+//		view.lookAt(0F, 0F, 0F,
+//		            0, 0F, 0F,
+//		            0, 0, 0);
+		FloatBuffer uniformsF=uniforms.asFloatBuffer();
 		
-		int matrixSize=Float.SIZE*16/Byte.SIZE;
-		model.get(0, uniforms);
-		view.get(matrixSize, uniforms);
-		projection.get(matrixSize*2, uniforms);
-		
+		int matrixSize=16;
+		model.get(0, uniformsF);
+		view.get(matrixSize, uniformsF);
+		projection.get(matrixSize*2, uniformsF);
+		uniformsF.put(matrixSize*3,1F);
 	}
 	
 	private void initModel(){
 		VkModelBuilder modelBuilder=new VkModelBuilder(VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT);
 		
-		modelBuilder.put3F(-0.5F, -0.5F, 0.5F).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(-0.5F, +0.5F, 0.5F).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(+0.5F, +0.5F, 0.5F).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(+0.5F, -0.5F, 0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(-0.5F, -0.5F, +0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(-0.5F, +0.5F, +0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, +0.5F, +0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, -0.5F, +0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(-0.5F, -0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(-0.5F, +0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, +0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, -0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
 		
 		modelBuilder.addIndices(
 			0, 1, 2,
-			0, 2, 3
+			0, 2, 3,
+			0+4, 2+4, 1+4,
+			0+4, 3+4, 2+4,
+			0, 1, 5,
+			0, 5, 6
 		                       );
 		
 		model=modelBuilder.bake(renderGpu, transferPool);

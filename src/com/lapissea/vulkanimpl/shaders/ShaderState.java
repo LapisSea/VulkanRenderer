@@ -114,7 +114,8 @@ public class ShaderState{
 		          .rasterizerDiscardEnable(false) //disable output to frame buffer
 		          .polygonMode(drawMode.polygonMode)
 		          .lineWidth(1)
-		          .cullMode(VK_CULL_MODE_BACK_BIT)
+//		          .cullMode(VK_CULL_MODE_BACK_BIT)
+		          .cullMode(VK_CULL_MODE_NONE)
 		          .frontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
 		          .depthBiasEnable(false)// modify true depth value of a fragment
 		          .depthBiasConstantFactor(0)

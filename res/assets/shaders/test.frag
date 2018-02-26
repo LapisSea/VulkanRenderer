@@ -12,6 +12,7 @@ void main() {
 	if(angle<0)angle=3.14*2+angle;
 	float length=pow(length(pos),2)/2;
 	float lel=sin(length*siz*sin(angle)+3.14/2)*cos(length*siz*cos(angle));
-    fragmentColor = color*max(lel,0);
+    fragmentColor = color*max(lel,0)*0.01;
+    fragmentColor.r=gl_FragCoord.z;
 
 }
