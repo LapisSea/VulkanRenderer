@@ -32,7 +32,7 @@ public class LaunchVk{
 //		System.setProperty("joml.nounsafe", "true");
 //		System.setProperty("joml.fastmath", "true");
 //		System.setProperty("joml.sinLookup", "true");
-		System.setProperty("VulkanRenderer.devMode", parsedArgs.get("dev"));
+		if(parsedArgs.containsKey("dev"))System.setProperty("VulkanRenderer.devMode", parsedArgs.get("dev"));
 	}
 	
 	

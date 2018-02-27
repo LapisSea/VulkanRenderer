@@ -38,12 +38,19 @@ public class ApplicationVk{
 	private long lastFpsPrint;
 	
 	public ApplicationVk(){
+		
+		if(!VulkanRenderer.VULKAN_INSTALLED){
+			FailMsg.create("Vulkan driver not installed/compatible! :(");
+			return;
+		}
+		
 		init();
 		while(run()) ;
 		destroy();
 	}
 	
 	public void init(){
+		
 		fps.activate();
 		
 		manger=new DataManager();
@@ -67,9 +74,15 @@ public class ApplicationVk{
 		setUpWindow();
 		
 		NanoTimer timer=new NanoTimer();
-		timer.start();
-		vkRenderer.createContext(gameWindow);
-		timer.end();
+		try{
+			timer.start();
+			vkRenderer.createContext(gameWindow);
+			timer.end();
+		}catch(Throwable e){
+			e.printStackTrace();
+			FailMsg.create("Vulkan failed to init! :(");
+			return;
+		}
 		
 		gameWindow.registryKeyboardKey.register(event->{
 			if(event.type!=GlfwKeyboardEvent.Type.DOWN) return;

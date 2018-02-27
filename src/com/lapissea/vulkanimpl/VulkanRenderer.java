@@ -3,6 +3,8 @@ package com.lapissea.vulkanimpl;
 import com.lapissea.datamanager.IDataManager;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.event.change.ChangeRegistryBool;
+import com.lapissea.vec.Vec2f;
+import com.lapissea.vec.Vec2i;
 import com.lapissea.vec.color.ColorM;
 import com.lapissea.vec.color.IColorM;
 import com.lapissea.vec.interf.IVec2iR;
@@ -23,6 +25,8 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
@@ -45,6 +49,16 @@ import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VulkanRenderer implements VkDestroyable{
+	public static final boolean VULKAN_INSTALLED;
+	
+	static{
+		boolean vulkanInstalled=false;
+		try{
+			System.loadLibrary("vulkan-1");
+			vulkanInstalled=true;
+		}catch(Throwable e){ }
+		VULKAN_INSTALLED=vulkanInstalled;
+	}
 	
 	public static class Settings{
 		
@@ -119,6 +133,11 @@ public class VulkanRenderer implements VkDestroyable{
 		initUniform();
 		initModel();
 		initSurfaceDependant();
+		Vec2i prevPos=new Vec2i(window.mousePos);
+		window.mousePos.register(e->{
+			bulge+=Math.sqrt(e.getSource().distanceTo(prevPos))/20;
+			prevPos.set(e.getSource());
+		});
 	}
 	
 	private void initUniform(){
@@ -164,47 +183,56 @@ public class VulkanRenderer implements VkDestroyable{
 		}
 	}
 	
+	float bulge;
+	
 	private void updateUniforms(ByteBuffer uniforms){
-		Matrix4f model     =new Matrix4f();
-		Matrix4f view      =new Matrix4f();
-		Matrix4f projection=new Matrix4f();
+		bulge=bulge*0.95F;
+		if(bulge<0.1) bulge=0.1F;
 		
-		model.rotate((float)((System.currentTimeMillis()/500D)%(Math.PI*2)),0,1,1).scale(1F);
-//		projection.rotate(0.1f,1,0,0);
-		float aspect=(float)window.size.x()/(float)window.size.y();
-//		projection.scale(1/aspect,1,1);
-//		projection.perspective((float) Math.toRadians(45.0f), aspect, 0f, 100f, false);
-//		view.lookAt(0F, 0F, 0F,
-//		            0, 0F, 0F,
-//		            0, 0, 0);
+		float farPlane=1000;
+		
+		Matrix4f model=new Matrix4f();
+		Matrix4f view =new Matrix4f();
+		Matrix4f proj =new Matrix4f();
+		
+		double tim  =System.currentTimeMillis()/1000D;
+		Vec2f  mouse=new Vec2f(window.mousePos).div(window.size).sub(0.5F);
+		
+		model.rotate((float)((tim/2)%(Math.PI*2)), 0, 0, 1).scale(2.5F);
+		view.lookAt(mouse.x()*5, 2, -mouse.y()*5,
+		            0, 0, 0,
+		            0, 0, 1);
+		proj.perspective((float)Math.toRadians(80), window.size.divXY(), 0.001F, farPlane, true);
+		
 		FloatBuffer uniformsF=uniforms.asFloatBuffer();
 		
 		int matrixSize=16;
 		model.get(0, uniformsF);
 		view.get(matrixSize, uniformsF);
-		projection.get(matrixSize*2, uniformsF);
-		uniformsF.put(matrixSize*3,1F);
+		proj.get(matrixSize*2, uniformsF);
+		uniformsF.put(matrixSize*3, (float)Math.sqrt(bulge));
 	}
 	
 	private void initModel(){
+		
 		VkModelBuilder modelBuilder=new VkModelBuilder(VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT);
 		
-		modelBuilder.put3F(-0.5F, -0.5F, +0.5F).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(-0.5F, +0.5F, +0.5F).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(+0.5F, +0.5F, +0.5F).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(+0.5F, -0.5F, +0.5F).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(-0.5F, -0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(-0.5F, +0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(+0.5F, +0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(+0.5F, -0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(-0.5F, -0.5F, +0F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(-0.5F, +0.5F, +0F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, +0.5F, +0F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, -0.5F, +0F).put4F(IColorM.randomRGBA()).next();
+//		modelBuilder.put3F(-0.5F, -0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
+//		modelBuilder.put3F(-0.5F, +0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
+//		modelBuilder.put3F(+0.5F, +0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
+//		modelBuilder.put3F(+0.5F, -0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
 		
 		modelBuilder.addIndices(
 			0, 1, 2,
-			0, 2, 3,
-			0+4, 2+4, 1+4,
-			0+4, 3+4, 2+4,
-			0, 1, 5,
-			0, 5, 6
+			0, 2, 3
+//			0+4, 2+4, 1+4,
+//			0+4, 3+4, 2+4,
+//			0, 1, 5,
+//			0, 5, 6
 		                       );
 		
 		model=modelBuilder.bake(renderGpu, transferPool);
@@ -306,11 +334,11 @@ public class VulkanRenderer implements VkDestroyable{
 			extensionNames.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 			
 		}
+		validateList(Vk.enumerateInstanceLayerProperties(stack).stream().map(VkLayerProperties::layerNameString).collect(Collectors.toList()), layerNames, "Layer");
 		
 		PointerBuffer requ=glfwGetRequiredInstanceExtensions();
 		Stream.generate(requ::getStringUTF8).limit(requ.limit()).forEach(extensionNames::add);
 		
-		validateList(Vk.enumerateInstanceLayerProperties(stack).stream().map(VkLayerProperties::layerNameString).collect(Collectors.toList()), layerNames, "Layer");
 		validateList(Vk.enumerateInstanceExtensionProperties(stack).stream().map(VkExtensionProperties::extensionNameString).collect(Collectors.toList()), extensionNames, "Extension");
 		
 	}
