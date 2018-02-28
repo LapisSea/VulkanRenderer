@@ -25,8 +25,6 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
@@ -195,11 +193,11 @@ public class VulkanRenderer implements VkDestroyable{
 		Matrix4f view =new Matrix4f();
 		Matrix4f proj =new Matrix4f();
 		
-		double tim  =System.currentTimeMillis()/1000D;
+		double tim  =System.currentTimeMillis()/500D;
 		Vec2f  mouse=new Vec2f(window.mousePos).div(window.size).sub(0.5F);
 		
 		model.rotate((float)((tim/2)%(Math.PI*2)), 0, 0, 1).scale(2.5F);
-		view.lookAt(mouse.x()*5, 2, -mouse.y()*5,
+		view.lookAt(mouse.x()*5, 2, -mouse.y()*15,
 		            0, 0, 0,
 		            0, 0, 1);
 		proj.perspective((float)Math.toRadians(80), window.size.divXY(), 0.001F, farPlane, true);
@@ -217,22 +215,29 @@ public class VulkanRenderer implements VkDestroyable{
 		
 		VkModelBuilder modelBuilder=new VkModelBuilder(VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT);
 		
-		modelBuilder.put3F(-0.5F, -0.5F, +0F).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(-0.5F, +0.5F, +0F).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(+0.5F, +0.5F, +0F).put4F(IColorM.randomRGBA()).next();
-		modelBuilder.put3F(+0.5F, -0.5F, +0F).put4F(IColorM.randomRGBA()).next();
-//		modelBuilder.put3F(-0.5F, -0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
-//		modelBuilder.put3F(-0.5F, +0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
-//		modelBuilder.put3F(+0.5F, +0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
-//		modelBuilder.put3F(+0.5F, -0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(-0.5F, -0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(-0.5F, +0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, +0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, -0.5F, -0.5F).put4F(IColorM.randomRGBA()).next();
+		
+		modelBuilder.put3F(-0.5F, -0.5F, +0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(-0.5F, +0.5F, +0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, +0.5F, +0.5F).put4F(IColorM.randomRGBA()).next();
+		modelBuilder.put3F(+0.5F, -0.5F, +0.5F).put4F(IColorM.randomRGBA()).next();
 		
 		modelBuilder.addIndices(
 			0, 1, 2,
-			0, 2, 3
-//			0+4, 2+4, 1+4,
-//			0+4, 3+4, 2+4,
-//			0, 1, 5,
-//			0, 5, 6
+			0, 2, 3,
+			4, 6, 5,
+			4, 7, 6,
+			0, 4, 1,
+			4, 5, 1,
+			2, 1, 5,
+			2, 5, 6,
+			3, 7, 4,
+			4, 0, 3,
+			6, 3, 2,
+			3, 6, 7
 		                       );
 		
 		model=modelBuilder.bake(renderGpu, transferPool);

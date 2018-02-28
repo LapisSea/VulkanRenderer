@@ -52,6 +52,16 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 		}
 	}
 	
+	public enum Cull{
+		FRONT(VK_CULL_MODE_FRONT_BIT),
+		BACK(VK_CULL_MODE_BACK_BIT),
+		NONE(VK_CULL_MODE_NONE);
+		
+		public final int handle;
+		
+		Cull(int handle){this.handle=handle;}
+	}
+	
 	public static final String SHADER_ROOT="assets/shaders/";
 	
 	public final  String               name;

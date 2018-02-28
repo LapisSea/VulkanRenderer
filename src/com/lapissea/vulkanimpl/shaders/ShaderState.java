@@ -5,7 +5,6 @@ import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.renderer.model.VkModelFormat;
 import com.lapissea.vulkanimpl.shaders.states.VkBlendMode;
 import com.lapissea.vulkanimpl.shaders.states.VkDrawMode;
-import com.lapissea.vulkanimpl.util.types.VkDescriptorSetLayout;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
@@ -35,15 +34,19 @@ public class ShaderState{
 	private final int[]           scissors       ={0, 0, 0, 0};
 	private final Vec2i           viewport       =new Vec2i();
 	private       VkPipelineInput input          =new VkPipelineInput(new VkModelFormat(0));
+	private       VkShader.Cull   cullMode       =VkShader.Cull.FRONT;
 	
 	public ShaderState setBlending(boolean blending){
 		this.blending=blending;
 		return this;
 	}
 	
-	public ShaderState setSampleLevel(int sampleLevel){
+	public void setSampleLevel(int sampleLevel){
 		this.sampleLevel=sampleLevel;
-		return this;
+	}
+	
+	public void setCullMode(VkShader.Cull cullMode){
+		this.cullMode=cullMode;
 	}
 	
 	public void setInput(VkPipelineInput input){
@@ -114,8 +117,7 @@ public class ShaderState{
 		          .rasterizerDiscardEnable(false) //disable output to frame buffer
 		          .polygonMode(drawMode.polygonMode)
 		          .lineWidth(1)
-//		          .cullMode(VK_CULL_MODE_BACK_BIT)
-		          .cullMode(VK_CULL_MODE_NONE)
+		          .cullMode(cullMode.handle)
 		          .frontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
 		          .depthBiasEnable(false)// modify true depth value of a fragment
 		          .depthBiasConstantFactor(0)
