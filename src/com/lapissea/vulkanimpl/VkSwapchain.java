@@ -179,7 +179,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		
 		int[] ids=new int[availablePresentModes.capacity()];
 		for(int i=0;i<availablePresentModes.capacity();i++) ids[i]=availablePresentModes.get(i);
-		VulkanRenderer.Settings settings=gpu.getInstance().getSettings();
+		VulkanCore.Settings settings=gpu.getInstance().getSettings();
 		
 		if(settings.trippleBufferingEnabled.get()&&UtilL.contains(ids, VK_PRESENT_MODE_MAILBOX_KHR)) return VK_PRESENT_MODE_MAILBOX_KHR;
 		if(settings.vSyncEnabled.get()&&UtilL.contains(ids, VK_PRESENT_MODE_FIFO_KHR)) return VK_PRESENT_MODE_FIFO_KHR;

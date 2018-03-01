@@ -2,7 +2,7 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 layout(location = 0) out vec4 out_color;
-layout(location = 1) out vec2 out_pos;
+layout(location = 1) out vec2 out_uv;
 layout(location = 2) out float out_bulge;
 
 out gl_PerVertex {
@@ -11,6 +11,7 @@ out gl_PerVertex {
 
 layout(location = 0) in vec3 pos;
 layout(location = 1) in vec4 color;
+layout(location = 2) in vec2 uv;
 
 
 layout(binding = 0) uniform UniformBufferObject{
@@ -21,8 +22,8 @@ layout(binding = 0) uniform UniformBufferObject{
 } ubo;
 
 void main() {
-    gl_Position= ubo.proj * ubo.view * ubo.model * vec4(pos, 1);//+vec4(pos, 1.0)*(1-ubo.mul);
+    gl_Position= ubo.proj * ubo.view * ubo.model * vec4(pos, 1);
     out_color = color;
-    out_pos=pos.xy;
+    out_uv=uv-0.5;
     out_bulge=ubo.mul;
 }

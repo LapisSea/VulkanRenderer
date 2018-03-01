@@ -5,19 +5,21 @@ import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.vulkan.VK10;
 
+import java.nio.LongBuffer;
+
 public class VkDescriptorSetLayout implements VkDestroyable, VkGpuCtx{
 	
-	private final long  handle;
-	private final VkGpu gpu;
+	private final LongBuffer buffer;
+	private final VkGpu      gpu;
 	
-	public VkDescriptorSetLayout(long handle, VkGpu gpu){
-		this.handle=handle;
+	public VkDescriptorSetLayout(LongBuffer buffer, VkGpu gpu){
+		this.buffer=buffer.asReadOnlyBuffer();
 		this.gpu=gpu;
 	}
 	
 	@Override
 	public void destroy(){
-		VK10.vkDestroyDescriptorSetLayout(getDevice(), handle, null);
+		VK10.vkDestroyDescriptorSetLayout(getDevice(), getHandle(), null);
 	}
 	
 	@Override
@@ -26,6 +28,10 @@ public class VkDescriptorSetLayout implements VkDestroyable, VkGpuCtx{
 	}
 	
 	public long getHandle(){
-		return handle;
+		return buffer.get(0);
+	}
+	
+	public LongBuffer getBuffer(){
+		return buffer;
 	}
 }

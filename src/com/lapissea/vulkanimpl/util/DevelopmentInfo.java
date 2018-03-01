@@ -8,7 +8,7 @@ public class DevelopmentInfo{
 	public static final boolean DEV_ON;
 	
 	static{
-		String key="VulkanRenderer.devMode",
+		String key="VulkanCore.devMode",
 			devArg0=System.getProperty(key, "false"),
 			devArg=devArg0.toLowerCase();
 		
@@ -18,7 +18,7 @@ public class DevelopmentInfo{
 			else throw UtilL.exitWithErrorMsg("Invalid property: "+key+"="+devArg0+" (valid: \"true\", \"false\", \"\")");
 		}
 		System.setProperty("org.lwjgl.util.NoChecks", Boolean.toString(DEV_ON));
-		LogUtil.println("Running VulkanRenderer in "+(DEV_ON?"development":"production")+" mode");
+		LogUtil.println("Running VulkanCore in "+(DEV_ON?"development":"production")+" mode");
 	}
 	
 	public static void checkOnLoad(){

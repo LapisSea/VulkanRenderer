@@ -3,6 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>VulkanNutCracker</groupId>
 	<artifactId>VulkanNutCracker</artifactId>
+	<packaging>pom</packaging>
 	<version>0.0.1</version>
 	<build>
 		<sourceDirectory>src</sourceDirectory>
@@ -21,6 +22,9 @@
 			</plugin>
 		</plugins>
 	</build>
+	<modules>
+		<module>../LWJGLUtil</module>
+	</modules>
 	<properties>
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>

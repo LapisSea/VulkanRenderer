@@ -81,7 +81,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		}
 	}
 	
-	private final VulkanRenderer instance;
+	private final VulkanCore instance;
 	
 	private final VkPhysicalDevice physicalDevice;
 	private       VkDevice         logicalDevice;
@@ -97,7 +97,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	private Queue                          transferQueue;
 	
 	
-	public VkGpu(VulkanRenderer instance, VkPhysicalDevice physicalDevice){
+	public VkGpu(VulkanCore instance, VkPhysicalDevice physicalDevice){
 		this.instance=instance;
 		this.physicalDevice=physicalDevice;
 		
@@ -253,7 +253,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		return memoryProperties;
 	}
 	
-	public VulkanRenderer getInstance(){
+	public VulkanCore getInstance(){
 		return instance;
 	}
 	
@@ -352,7 +352,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 				                .stageFlags(repeat[i*2+1]);
 			}
 			layoutInfo.pBindings(uboLayoutBinding);
-			return Vk.createDescriptorSetLayout(this, layoutInfo, stack.mallocLong(1));
+			return Vk.createDescriptorSetLayout(this, layoutInfo);
 		}
 	}
 	

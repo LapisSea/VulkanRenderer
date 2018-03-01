@@ -2,7 +2,7 @@ package com.lapissea.vulkanimpl.util.types;
 
 import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.VkGpu;
-import com.lapissea.vulkanimpl.VulkanRenderer;
+import com.lapissea.vulkanimpl.VulkanCore;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
@@ -13,9 +13,9 @@ public class VkSurface implements VkDestroyable{
 	
 	public final long handle;
 	
-	private final VulkanRenderer renderer;
+	private final VulkanCore renderer;
 	
-	public VkSurface(long handle, VulkanRenderer renderer){
+	public VkSurface(long handle, VulkanCore renderer){
 		this.handle=handle;
 		this.renderer=renderer;
 	}

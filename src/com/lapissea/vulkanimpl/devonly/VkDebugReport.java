@@ -4,7 +4,7 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.Vk;
-import com.lapissea.vulkanimpl.VulkanRenderer;
+import com.lapissea.vulkanimpl.VulkanCore;
 import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -23,7 +23,7 @@ public class VkDebugReport{
 	
 	static{ DevelopmentInfo.checkOnLoad(); }
 	
-	public VkDebugReport(VulkanRenderer renderer, List<Type> errTypes, List<Type> outTypes){
+	public VkDebugReport(VulkanCore renderer, List<Type> errTypes, List<Type> outTypes){
 		this(renderer, Stream.concat(errTypes.stream(), outTypes.stream()).collect(Collectors.toList()), (type, prefix, code, message)->{
 			if(message.startsWith("Device Extension")) return;
 			
@@ -61,10 +61,10 @@ public class VkDebugReport{
 		void invoke(Type type, String prefix, int code, String message);
 	}
 	
-	private final long           callback;
-	private final VulkanRenderer instance;
+	private final long       callback;
+	private final VulkanCore instance;
 	
-	public VkDebugReport(VulkanRenderer instance, Iterable<Type> reportTypes, VkDebugReport.Hook hook){
+	public VkDebugReport(VulkanCore instance, Iterable<Type> reportTypes, VkDebugReport.Hook hook){
 		this(instance, reportTypes, (flags, objectType, object, location, messageCode, pLayerPrefix, pMessage, pUserData)->{
 			Type type=Type.UNKNOWN;
 			for(Type t : Type.values()){
@@ -87,7 +87,7 @@ public class VkDebugReport{
 		});
 	}
 	
-	public VkDebugReport(VulkanRenderer instance, Iterable<Type> reportTypes, VkDebugReportCallbackEXTI hook){
+	public VkDebugReport(VulkanCore instance, Iterable<Type> reportTypes, VkDebugReportCallbackEXTI hook){
 		this.instance=instance;
 		try(MemoryStack stack=stackPush()){
 			int flags=0;
@@ -105,7 +105,7 @@ public class VkDebugReport{
 		}
 	}
 	
-	public VkDebugReport(VulkanRenderer instance, VkDebugReportCallbackCreateInfoEXT createInfo){
+	public VkDebugReport(VulkanCore instance, VkDebugReportCallbackCreateInfoEXT createInfo){
 		this.instance=instance;
 		try(MemoryStack stack=stackPush()){
 			callback=createDebugReportCallbackEXT(instance.getInstance(), createInfo, null, stack.mallocLong(1));

@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.IntStream;
 
 import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
@@ -28,7 +29,7 @@ public class ApplicationVk{
 	
 	private static final boolean TO_JAR=true;
 	
-	private VulkanRenderer vkRenderer;
+	private VulkanCore vkRenderer;
 	private GlfwWindowVk gameWindow =new GlfwWindowVk();
 	private File         winSaveFile=new File("WindowState.json");
 	
@@ -39,7 +40,7 @@ public class ApplicationVk{
 	
 	public ApplicationVk(){
 		
-		if(!VulkanRenderer.VULKAN_INSTALLED){
+		if(!VulkanCore.VULKAN_INSTALLED){
 			FailMsg.create("Vulkan driver not installed/compatible! :(");
 			return;
 		}
@@ -65,7 +66,7 @@ public class ApplicationVk{
 			}
 		}
 		
-		vkRenderer=new VulkanRenderer(manger);
+		vkRenderer=new VulkanCore(manger.subData("assets"));
 		vkRenderer.getSettings().trippleBufferingEnabled.set(false);
 		GlfwMonitor.init();
 		
@@ -108,32 +109,33 @@ public class ApplicationVk{
 		gameWindow.title.set("Vulkan attempt 2");
 		gameWindow.init();
 		
-		TIntList pows=new TIntArrayList(5);
-		IntStream.range(3, 8).map(i->1<<i).forEach(pows::add);
-		
-		String iconsPath="assets/textures/icon/";
-		gameWindow.setIcon(
-			manger.getDirNamesS(iconsPath)
-			      .parallel()
-			      .map(fileName->{
-				      try{
-					      String name=fileName.substring(fileName.lastIndexOf(File.separatorChar)+1, fileName.lastIndexOf('.'));
-					      int    res =Integer.parseInt(name);
-					
-					      if(pows.contains(res)){
-						      try(InputStream i=manger.getInStream(iconsPath+fileName)){
-							      BufferedImage bi=ImageIO.read(i);
-							      if(bi.getWidth()!=res||bi.getHeight()!=res) return null;
-							      return bi;
+		CompletableFuture.runAsync(()->{
+			TIntList pows=new TIntArrayList(5);
+			IntStream.range(3, 8).map(i->1<<i).forEach(pows::add);
+			
+			String iconsPath="assets/textures/icon/";
+			gameWindow.setIcon(
+				manger.getDirNamesS(iconsPath)
+				      .parallel()
+				      .map(fileName->{
+					      try{
+						      String name=fileName.substring(fileName.lastIndexOf(File.separatorChar)+1, fileName.lastIndexOf('.'));
+						      int    res =Integer.parseInt(name);
+						
+						      if(pows.contains(res)){
+							      try(InputStream i=manger.getInStream(iconsPath+fileName)){
+								      BufferedImage bi=ImageIO.read(i);
+								      if(bi.getWidth()!=res||bi.getHeight()!=res) return null;
+								      return bi;
+							      }
 						      }
-					      }
-				      }catch(Exception e){}
-				      return null;
-			      })
-			      .filter(Objects::nonNull)
-			      .map(GlfwWindow::imgToGlfw)
-			      .toArray(GLFWImage[]::new));
-		
+					      }catch(Exception e){}
+					      return null;
+				      })
+				      .filter(Objects::nonNull)
+				      .map(GlfwWindow::imgToGlfw)
+				      .toArray(GLFWImage[]::new));
+		});
 	}
 	
 	public boolean run(){

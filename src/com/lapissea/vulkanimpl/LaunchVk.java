@@ -11,7 +11,7 @@ public class LaunchVk{
 	
 	
 	public static void main(String[] args){
-		LogUtil.__.create(true, false, "log");
+		LogUtil.__.create(true, true, null);
 		
 		Map<String, String> parsedArgs=new HashMap<>();
 		
@@ -32,7 +32,7 @@ public class LaunchVk{
 //		System.setProperty("joml.nounsafe", "true");
 //		System.setProperty("joml.fastmath", "true");
 //		System.setProperty("joml.sinLookup", "true");
-		if(parsedArgs.containsKey("dev"))System.setProperty("VulkanRenderer.devMode", parsedArgs.get("dev"));
+		if(parsedArgs.containsKey("dev"))System.setProperty("VulkanCore.devMode", parsedArgs.get("dev"));
 	}
 	
 	

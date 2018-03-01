@@ -3,6 +3,7 @@ package com.lapissea.vulkanimpl.util;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
+import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkConstruct{
@@ -63,8 +64,8 @@ public class VkConstruct{
 		return VkDescriptorPoolCreateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO);
 	}
 	
-	public static VkDescriptorSetAllocateInfo descriptorSetAllocateInfo(MemoryStack stack){
-		return VkDescriptorSetAllocateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO);
+	public static VkDescriptorSetAllocateInfo descriptorSetAllocateInfo(){
+		return VkDescriptorSetAllocateInfo.calloc().sType(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO);
 	}
 	
 	public static VkWriteDescriptorSet.Buffer writeDescriptorSet(int count, MemoryStack stack){
@@ -73,5 +74,9 @@ public class VkConstruct{
 			buff.get(i).sType(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET);
 		}
 		return buff;
+	}
+	
+	public static VkPresentInfoKHR presentInfoKHR(){
+		return VkPresentInfoKHR.calloc().sType(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR);
 	}
 }

@@ -466,19 +466,22 @@ public class Vk{
 		return new VkFence(ctx, dest.get(0));
 	}
 	
-	public static VkDescriptorSetLayout createDescriptorSetLayout(VkGpuCtx ctx, VkDescriptorSetLayoutCreateInfo info, LongBuffer dest){
+	public static VkDescriptorSetLayout createDescriptorSetLayout(VkGpuCtx ctx, VkDescriptorSetLayoutCreateInfo info){
+		LongBuffer dest=memAllocLong(1);
+		
 		int code=vkCreateDescriptorSetLayout(ctx.getDevice(), info, null, dest);
 		if(DEV_ON) check(code);
-		return new VkDescriptorSetLayout(dest.get(0), ctx.getGpu());
+		return new VkDescriptorSetLayout(dest, ctx.getGpu());
 	}
 	
-	public static long createDescriptorPool(VkGpuCtx ctx, VkDescriptorPoolCreateInfo info, LongBuffer dest){
+	public static VkDescriptorPool createDescriptorPool(VkGpuCtx ctx, VkDescriptorPoolCreateInfo info, LongBuffer dest){
 		int code=vkCreateDescriptorPool(ctx.getDevice(), info, null, dest);
 		if(DEV_ON) check(code);
-		return dest.get(0);
+		return new VkDescriptorPool(ctx.getGpu(), dest.get(0));
 	}
 	
 	public static long allocateDescriptorSets(VkGpuCtx ctx, VkDescriptorSetAllocateInfo info, LongBuffer dest){
+		
 		int code=vkAllocateDescriptorSets(ctx.getDevice(), info, dest);
 		if(DEV_ON) check(code);
 		return dest.get(0);
