@@ -68,8 +68,13 @@ public class VkDeviceMemory implements VkGpuCtx, VkDestroyable{
 		return handle.get(0);
 	}
 	
-	public void bindBuffer(VkBuffer modelBuffer){
-		vkBindBufferMemory(getDevice(), modelBuffer.getHandle(), handle.get(0), 0);
+	public void bindBuffer(VkBuffer buffer){
+		vkBindBufferMemory(getDevice(), buffer.getHandle(), handle.get(0), 0);
+	}
+	
+	
+	public void bindImage(VkImage image){
+		vkBindImageMemory(getDevice(), image.getHandle(), handle.get(0), 0);
 	}
 	
 	public PointerBuffer map(long offset, long size, PointerBuffer pp){

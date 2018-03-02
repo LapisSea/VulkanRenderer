@@ -210,7 +210,7 @@ public class VkModelBuilder{
 		}
 		
 		VkBuffer       stagingBuffer=gpu.createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, totalSize);
-		VkDeviceMemory stagingMemory=stagingBuffer.allocateBufferMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		VkDeviceMemory stagingMemory=stagingBuffer.createMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		try(VkDeviceMemory.MemorySession ses=stagingMemory.memorySession(stagingBuffer.size)){
 			ByteBuffer mem=ses.memory;
 			writeVertex(mem);
@@ -228,7 +228,7 @@ public class VkModelBuilder{
 		if(indexed) usage|=VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 		
 		VkBuffer       modelBuffer=gpu.createBuffer(usage, totalSize);
-		VkDeviceMemory modelMemory=modelBuffer.allocateBufferMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		VkDeviceMemory modelMemory=modelBuffer.createMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		
 		modelBuffer.copyFrom(stagingBuffer, 0, transferPool);
 		

@@ -1,6 +1,5 @@
 package com.lapissea.vulkanimpl.util.types;
 
-import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.VulkanCore;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
@@ -13,17 +12,13 @@ public class VkSurface implements VkDestroyable{
 	
 	public final long handle;
 	
-	private final VulkanCore renderer;
+	public final VulkanCore renderer;
 	
 	public VkSurface(long handle, VulkanCore renderer){
 		this.handle=handle;
 		this.renderer=renderer;
 	}
 	
-	
-	public IVec2iR getSize(){
-		return renderer.getWindow().size;
-	}
 	
 	public VkSurfaceCapabilitiesKHR getCapabilities(VkGpu gpu, MemoryStack stack){
 		return getCapabilities(gpu, VkSurfaceCapabilitiesKHR.mallocStack(stack));
@@ -38,4 +33,5 @@ public class VkSurface implements VkDestroyable{
 	public void destroy(){
 		vkDestroySurfaceKHR(renderer.getInstance(), handle, null);
 	}
+	
 }

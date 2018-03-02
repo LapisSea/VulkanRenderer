@@ -5,9 +5,7 @@ import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.vulkan.VkCommandBuffer;
-import org.lwjgl.vulkan.VkCommandBufferBeginInfo;
-import org.lwjgl.vulkan.VkCommandBufferInheritanceInfo;
+import org.lwjgl.vulkan.*;
 
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
@@ -60,5 +58,17 @@ public class VkCommandBufferM extends VkCommandBuffer implements VkGpuCtx, VkDes
 	@Override
 	public void destroy(){
 		vkFreeCommandBuffers(getDevice(), pool.getHandle(), this);
+	}
+	
+	public void pipelineBarrier(int srcStageMask, int dstStageMask, int dependencyFlags, VkImageMemoryBarrier.Buffer pImageMemoryBarriers){
+		pipelineBarrier(srcStageMask, dstStageMask, dependencyFlags, null, null, pImageMemoryBarriers);
+	}
+	
+	public void pipelineBarrier(int srcStageMask, int dstStageMask, int dependencyFlags, VkMemoryBarrier.Buffer pMemoryBarriers, VkBufferMemoryBarrier.Buffer pBufferMemoryBarriers, VkImageMemoryBarrier.Buffer pImageMemoryBarriers){
+		vkCmdPipelineBarrier(this, srcStageMask, dstStageMask, dependencyFlags, pMemoryBarriers, pBufferMemoryBarriers, pImageMemoryBarriers);
+	}
+	
+	public void copyBufferToImage(VkBuffer buffer, VkImage image, VkBufferImageCopy.Buffer region){
+		vkCmdCopyBufferToImage(this, buffer.getHandle(), image.getHandle(), image.getLayout(), region);
 	}
 }

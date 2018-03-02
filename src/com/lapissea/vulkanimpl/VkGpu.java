@@ -231,10 +231,9 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	}
 	
 	public VkDeviceMemory allocateMemory(VkMemoryRequirements memRequ, long size, int requestedProperties){
-		try(MemoryStack stack=stackPush()){
-			int memIndex=findMemoryType(memRequ, requestedProperties);
-			if(memIndex==-1) throw new IllegalArgumentException("Can not find memory with properties: "+Integer.toString(requestedProperties, 2));
-			VkMemoryAllocateInfo allocInfo=VkConstruct.memoryAllocateInfo(stack);
+		int memIndex=findMemoryType(memRequ, requestedProperties);
+		if(memIndex==-1) throw new IllegalArgumentException("Can not find memory with properties: "+Integer.toString(requestedProperties, 2));
+		try(VkMemoryAllocateInfo allocInfo=VkConstruct.memoryAllocateInfo()){
 			allocInfo.allocationSize(Math.max(memRequ.size(), size))
 			         .memoryTypeIndex(memIndex);
 			return Vk.allocateMemory(this, allocInfo);
@@ -353,6 +352,27 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			}
 			layoutInfo.pBindings(uboLayoutBinding);
 			return Vk.createDescriptorSetLayout(this, layoutInfo);
+		}
+	}
+	
+	public VkImage create2DImage(int width, int height, int format, int tiling, int usage){
+		try(VkImageCreateInfo imageInfo=VkConstruct.imageCreateInfo()){
+			imageInfo.extent().set(width, height, 1);
+			imageInfo.imageType(VK_IMAGE_TYPE_2D)
+			         .mipLevels(1)
+			         .arrayLayers(1)
+			         .format(format)
+			         .tiling(tiling)
+			         .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
+			         .usage(usage)
+			         .sharingMode(VK_SHARING_MODE_EXCLUSIVE)
+			         .samples(VK_SAMPLE_COUNT_1_BIT);
+			/*
+			* VK_IMAGE_LAYOUT_UNDEFINED: Not usable by the GPU and the very first transition will discard the texels.
+			* VK_IMAGE_LAYOUT_PREINITIALIZED: Not usable by the GPU, but the first transition will preserve the texels.
+			* */
+			
+			return VkImage.create(this, imageInfo);
 		}
 	}
 	

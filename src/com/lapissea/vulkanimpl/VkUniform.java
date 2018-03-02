@@ -19,7 +19,7 @@ public class VkUniform implements VkDestroyable{
 	public VkUniform(VkGpu gpu, int size, Consumer<ByteBuffer> writeBufferData){
 		this.writeBufferData=writeBufferData;
 		buffer=gpu.createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, size);
-		memory=buffer.allocateBufferMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		memory=buffer.createMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
 	
 	public void updateBuffer(){

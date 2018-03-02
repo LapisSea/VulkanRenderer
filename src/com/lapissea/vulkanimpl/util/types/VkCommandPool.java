@@ -46,7 +46,7 @@ public class VkCommandPool implements VkDestroyable, VkGpuCtx{
 		}
 	}
 	
-	public void freeCommandBuffer(VkCommandBuffer commandBuffer){
+	public void freeCmd(VkCommandBuffer commandBuffer){
 		vkFreeCommandBuffers(getDevice(), handle, commandBuffer);
 	}
 	

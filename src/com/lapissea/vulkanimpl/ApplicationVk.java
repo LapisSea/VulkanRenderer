@@ -46,6 +46,11 @@ public class ApplicationVk{
 		}
 		
 		init();
+		new Thread(()->{
+			while(!gameWindow.shouldClose()){
+				render();
+			}
+		}, "Render").start();
 		while(run()) ;
 		destroy();
 	}
@@ -66,8 +71,8 @@ public class ApplicationVk{
 			}
 		}
 		
-		vkRenderer=new VulkanCore(manger.subData("assets"));
-		vkRenderer.getSettings().trippleBufferingEnabled.set(false);
+		vkRenderer=new VulkanCore(manger.subData("assets"), gameWindow);
+		vkRenderer.getSettings().tripleBufferingEnabled.set(false);
 		GlfwMonitor.init();
 		
 		Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "shutdown-thread"));
@@ -77,7 +82,7 @@ public class ApplicationVk{
 		NanoTimer timer=new NanoTimer();
 		try{
 			timer.start();
-			vkRenderer.createContext(gameWindow);
+			vkRenderer.createContext();
 			timer.end();
 		}catch(Throwable e){
 			e.printStackTrace();
@@ -141,7 +146,6 @@ public class ApplicationVk{
 	public boolean run(){
 		gameWindow.pollEvents();
 		if(gameWindow.shouldClose()) return false;
-		render();
 		return true;
 	}
 	
@@ -150,8 +154,8 @@ public class ApplicationVk{
 			UtilL.sleep(1);
 			return;
 		}
-		
 		vkRenderer.render();
+
 //		fps.newFrame();
 //
 //		long tim=System.currentTimeMillis();

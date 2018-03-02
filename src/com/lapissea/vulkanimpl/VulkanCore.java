@@ -1,6 +1,7 @@
 package com.lapissea.vulkanimpl;
 
 import com.lapissea.datamanager.IDataManager;
+import com.lapissea.glfw.BuffUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.event.change.ChangeRegistryBool;
 import com.lapissea.vec.Vec2f;
@@ -42,6 +43,7 @@ import static com.lapissea.vulkanimpl.devonly.VkDebugReport.Type.*;
 import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryStack.*;
+import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.EXTDebugReport.*;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
@@ -60,8 +62,8 @@ public class VulkanCore implements VkDestroyable{
 	
 	public static class Settings{
 		
-		public ChangeRegistryBool vSyncEnabled           =new ChangeRegistryBool(true);
-		public ChangeRegistryBool trippleBufferingEnabled=new ChangeRegistryBool(true);
+		public ChangeRegistryBool vSyncEnabled          =new ChangeRegistryBool(true);
+		public ChangeRegistryBool tripleBufferingEnabled=new ChangeRegistryBool(true);
 	}
 	
 	public static final String ENGINE_NAME   ="JLapisor";
@@ -74,8 +76,8 @@ public class VulkanCore implements VkDestroyable{
 	private VkGpu renderGpu;
 //	private VkGpu computeGpu;
 	
-	private VkSwapchain  swapchain;
-	private GlfwWindowVk window;
+	private       VkSwapchain  swapchain;
+	private final GlfwWindowVk window;
 	
 	private VkSurface surface;
 	
@@ -89,23 +91,22 @@ public class VulkanCore implements VkDestroyable{
 	private VkCommandPool      transferPool;
 	private VkCommandBufferM[] sceneCommandBuffers;
 	
-	private boolean surfaceBad;
-	
 	private VkModel               model;
 	private VkUniform             mainUniform;
 	private VkDescriptorSetLayout uniformLayout;
 	private VkDescriptorPool      descriptorPool;
 	private long                  descriptorSet;
 	
-	private VulkanRender renderer=new VulkanRender();
+	private       VulkanRender renderer    =new VulkanRender();
+	private final Object       recreateLock=new Object();
 	
-	public VulkanCore(IDataManager assets){
+	public VulkanCore(IDataManager assets, GlfwWindowVk window){
 		this.assets=assets;
+		this.window=window;
 	}
 	
-	public void createContext(GlfwWindowVk window){
+	public void createContext(){
 		
-		this.window=window;
 		window.size.register(e->onWindowResize(e.getSource()));
 		
 		try(MemoryStack stack=stackPush()){
@@ -143,7 +144,26 @@ public class VulkanCore implements VkDestroyable{
 		try{
 			BufferedImage image=ImageIO.read(assets.getInStream("textures/SmugDude.png"));
 			
+			int width =image.getWidth();
+			int height=image.getHeight();
 			
+			ByteBuffer buff=BuffUtil.imageToBuffer(image, memAlloc(width*height*4));
+			
+			VkBuffer       stagingBuffer=renderGpu.createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, buff.capacity());
+			VkDeviceMemory stagingMemory=stagingBuffer.createMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			
+			stagingMemory.memorySession(stagingBuffer.size, mem->{
+				mem.put(buff);
+				memFree(buff);
+			});
+			
+			VkImage textureImage=renderGpu.create2DImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT);
+			
+			VkDeviceMemory textureImageMemory=textureImage.createMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			
+			textureImage.transitionLayout(renderGpu.getTransferQueue(), transferPool, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+			textureImage.copyFromBuffer(renderGpu.getTransferQueue(), transferPool, stagingBuffer);
+			textureImage.transitionLayout(renderGpu.getTransferQueue(), transferPool, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			
 		}catch(IOException e){
 			e.printStackTrace();
@@ -203,7 +223,7 @@ public class VulkanCore implements VkDestroyable{
 		Vec2f  mouse=new Vec2f(window.mousePos).div(window.size).sub(0.5F);
 		
 		model.rotate((float)((tim/2)%(Math.PI*2)), 0, 0, 1).scale(2F);
-		view.lookAt(mouse.x()*5, 2, -mouse.y()*15,
+		view.lookAt(0, 2, -3,
 		            0, 0, 0,
 		            0, 0, 1);
 		proj.perspective((float)Math.toRadians(80), window.size.divXY(), 0.001F, farPlane, true);
@@ -250,8 +270,7 @@ public class VulkanCore implements VkDestroyable{
 	}
 	
 	private void initSurfaceDependant(){
-		
-		swapchain=new VkSwapchain(renderGpu, surface);
+		swapchain=new VkSwapchain(renderGpu, surface, window.size);
 		renderPass=createRenderPass();
 		shader=createGraphicsPipeline(model.getFormat());
 		swapchain.initFrameBuffers(renderPass);
@@ -265,7 +284,7 @@ public class VulkanCore implements VkDestroyable{
 			VkCommandBufferM sceneBuffer=sceneCommandBuffers[frame.index];
 			
 			sceneBuffer.begin();
-			renderPass.begin(sceneBuffer, frame.getFrameBuffer(), surface.getSize(), new ColorM(0, 0, 0, 0));
+			renderPass.begin(sceneBuffer, frame.getFrameBuffer(), swapchain.getSize(), new ColorM(0, 0, 0, 0));
 			
 			
 			shader.bind(sceneBuffer);
@@ -428,19 +447,17 @@ public class VulkanCore implements VkDestroyable{
 		return shader;
 	}
 	
-	private void onWindowResize(IVec2iR size){
-		surfaceBad=true;
-	}
-	
 	private void recreateSurface(){
-		renderGpu.waitIdle();
-		surfaceBad=false;
-		destroySurfaceDependant();
-		initSurfaceDependant();
+		synchronized(recreateLock){
+			renderGpu.waitIdle();
+			destroySurfaceDependant();
+			initSurfaceDependant();
+		}
 	}
 	
 	private void destroySurfaceDependant(){
 		forEach(sceneCommandBuffers, VkCommandBufferM::destroy);
+		sceneCommandBuffers=null;
 		shader.destroy();
 		renderPass.destroy();
 		swapchain.destroy();
@@ -473,25 +490,28 @@ public class VulkanCore implements VkDestroyable{
 		vkDestroyInstance(instance, null);
 	}
 	
+	private void onWindowResize(IVec2iR size){
+		recreateSurface();
+	}
+	
 	public void render(){
-		
 		mainUniform.updateBuffer();
-		
 		submitRender();
 	}
 	
 	private void submitRender(){
-		
-		if(surfaceBad) recreateSurface();
-		
-		VkSwapchain.Frame frame=swapchain.acquireNextFrame();
-		
-		if(frame==null){
-			surfaceBad=true;
-			return;
+		synchronized(recreateLock){
+			
+			VkSwapchain.Frame frame=swapchain.acquireNextFrame();
+			
+			if(frame==null){
+				recreateSurface();
+				return;
+			}
+			
+			if(renderer.render(swapchain, frame, sceneCommandBuffers[frame.index])) recreateSurface();
+			
 		}
-		
-		if(renderer.render(swapchain, frame, sceneCommandBuffers[frame.index])) surfaceBad=true;
 	}
 	
 	public VkInstance getInstance(){

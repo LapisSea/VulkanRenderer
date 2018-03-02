@@ -2,10 +2,10 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.util.VkConstruct;
+import com.lapissea.vulkanimpl.util.types.VkCommandBufferM;
 import com.lapissea.vulkanimpl.util.types.VkCommandPool;
 import com.lapissea.vulkanimpl.util.types.VkFence;
 import org.lwjgl.PointerBuffer;
-import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkCommandBufferBeginInfo;
 import org.lwjgl.vulkan.VkSubmitInfo;
 
@@ -14,10 +14,10 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public class SingleUseCommandBuffer implements AutoCloseable{
 	
-	public  VkCommandBuffer commandBuffer;
-	private VkCommandPool   pool;
-	private VkGpu.Queue     queue;
-	private boolean         closed;
+	public  VkCommandBufferM commandBuffer;
+	private VkCommandPool    pool;
+	private VkGpu.Queue      queue;
+	private boolean          closed;
 	
 	public SingleUseCommandBuffer(VkGpu.Queue queue, VkCommandPool pool){
 		this.queue=queue;
@@ -45,7 +45,7 @@ public class SingleUseCommandBuffer implements AutoCloseable{
 		
 		fence.waitFor();
 		
-		pool.freeCommandBuffer(commandBuffer);
+		pool.freeCmd(commandBuffer);
 		fence.destroy();
 		
 		commandBuffer=null;

@@ -56,24 +56,23 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	private final VkGpu       gpu;
 	private       int         format;
 	private       int         colorSpace;
-	private final VkSurface   surface;
 	private       VkSemaphore imageAviable;
 	private       List<Frame> frames;
+	private final VkExtent2D extent=VkExtent2D.calloc();
 	
 	private IntBuffer acquireNextImageMem=memAllocInt(1);
 	
 	private VkCommandBufferM[] frameBinds;
 	
-	public VkSwapchain(VkGpu gpu, VkSurface surface){
-		this.surface=surface;
+	public VkSwapchain(VkGpu gpu, VkSurface surface, IVec2iR size){
 		this.gpu=gpu;
 		try(MemoryStack stack=stackPush()){
-			create(gpu, surface, stack);
+			create(gpu, surface, size, stack);
 		}
 		imageAviable=gpu.createSemaphore();
 	}
 	
-	private void create(VkGpu gpu, VkSurface surface, MemoryStack stack){
+	private void create(VkGpu gpu, VkSurface surface, IVec2iR size, MemoryStack stack){
 		
 		//acquire currency
 		IntBuffer count=stack.mallocInt(1);
@@ -88,7 +87,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		//regard females
 		int                presentMode=choosePresentMode(presentModes);
 		VkSurfaceFormatKHR format     =chooseSwapSurfaceFormat(Vk.getPhysicalDeviceSurfaceFormatsKHR(gpu, stack));
-		VkExtent2D         extent     =chooseSwapExtent(surface.getSize(), stack, surface.getCapabilities(gpu, stack));
+		chooseSwapExtent(size, stack, surface.getCapabilities(gpu, stack));
 		
 		int imageCount=caps.minImageCount()+1;
 		if(caps.maxImageCount()>0) imageCount=Math.min(imageCount, caps.maxImageCount());
@@ -141,8 +140,8 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 			VkFramebufferCreateInfo framebufferInfo=VkFramebufferCreateInfo.callocStack(stack);
 			framebufferInfo.sType(VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO)
 			               .renderPass(renderPass.getHandle())
-			               .width(surface.getSize().x())
-			               .height(surface.getSize().y())
+			               .width(extent.width())
+			               .height(extent.height())
 			               .layers(1);
 			
 			LongBuffer lb=stack.mallocLong(1), view=stack.mallocLong(1);
@@ -167,12 +166,15 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		return availableFormats.get(0);
 	}
 	
-	private VkExtent2D chooseSwapExtent(IVec2iR size, MemoryStack stack, VkSurfaceCapabilitiesKHR capabilities){
-		if(capabilities.currentExtent().width()==0xFFFFFFFF) return capabilities.currentExtent();
+	private void chooseSwapExtent(IVec2iR size, MemoryStack stack, VkSurfaceCapabilitiesKHR capabilities){
+		if(capabilities.currentExtent().width()==0xFFFFFFFF){
+			extent.set(capabilities.currentExtent());
+			return;
+		}
 		
 		VkExtent2D min=capabilities.minImageExtent(), max=capabilities.maxImageExtent();
 		
-		return VkExtent2D.callocStack(stack).set(MathUtil.snap(size.x(), min.width(), max.width()), MathUtil.snap(size.y(), min.height(), max.height()));
+		extent.set(MathUtil.snap(size.x(), min.width(), max.width()), MathUtil.snap(size.y(), min.height(), max.height()));
 	}
 	
 	private int choosePresentMode(IntBuffer availablePresentModes){
@@ -181,7 +183,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		for(int i=0;i<availablePresentModes.capacity();i++) ids[i]=availablePresentModes.get(i);
 		VulkanCore.Settings settings=gpu.getInstance().getSettings();
 		
-		if(settings.trippleBufferingEnabled.get()&&UtilL.contains(ids, VK_PRESENT_MODE_MAILBOX_KHR)) return VK_PRESENT_MODE_MAILBOX_KHR;
+		if(settings.tripleBufferingEnabled.get()&&UtilL.contains(ids, VK_PRESENT_MODE_MAILBOX_KHR)) return VK_PRESENT_MODE_MAILBOX_KHR;
 		if(settings.vSyncEnabled.get()&&UtilL.contains(ids, VK_PRESENT_MODE_FIFO_KHR)) return VK_PRESENT_MODE_FIFO_KHR;
 		return VK_PRESENT_MODE_IMMEDIATE_KHR;
 	}
@@ -227,5 +229,9 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	
 	public VkSemaphore getImageAviable(){
 		return imageAviable;
+	}
+	
+	public VkExtent2D getSize(){
+		return extent;
 	}
 }

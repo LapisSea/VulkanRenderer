@@ -285,19 +285,24 @@ public class Vk{
 		return imageCount.get(0);
 	}
 	
-	public static VkImage[] getSwapchainImagesKHR(VkGpu gpu, VkSwapchain vkSwapchain, MemoryStack stack){
+	public static VkImage[] getSwapchainImagesKHR(VkGpu gpu, VkSwapchain swapchain, MemoryStack stack){
 		IntBuffer ib   =stack.mallocInt(1);
-		int       count=getSwapchainImagesKHR(gpu, vkSwapchain, ib, null);
+		int       count=getSwapchainImagesKHR(gpu, swapchain, ib, null);
 		
 		LongBuffer lb=stack.mallocLong(count);
-		getSwapchainImagesKHR(gpu, vkSwapchain, ib, lb);
+		getSwapchainImagesKHR(gpu, swapchain, ib, lb);
 		
 		VkImage[] images=new VkImage[count];
 		for(int i=0;i<lb.limit();i++){
-			images[i]=new VkImage(memAllocLong(1).put(0, lb.get(i)), gpu){
+			images[i]=new VkImage(memAllocLong(1).put(0, lb.get(i)), gpu, VK_IMAGE_LAYOUT_UNDEFINED, VkExtent3D.calloc().set(swapchain.getSize().width(), swapchain.getSize().height(), 1)){
 				@Override
 				public void destroy(){
 					memFree(getBuff());
+				}
+				
+				@Override
+				public void transitionLayout(VkGpu.Queue queue, VkCommandPool pool, int newLayout){
+					throw new RuntimeException();
 				}
 			};
 		}
@@ -406,12 +411,9 @@ public class Vk{
 	
 	public static boolean queuePresentKHR(VkQueue queue, VkPresentInfoKHR presentInfo){
 		int code=vkQueuePresentKHR(queue, presentInfo);
-		if(DEV_ON){
-			if(code==VK_SUBOPTIMAL_KHR) return true;
-			check(code);
-			return false;
-		}
-		return code==VK_SUBOPTIMAL_KHR;
+		if(code==VK_SUBOPTIMAL_KHR||code==VK_ERROR_OUT_OF_DATE_KHR) return true;
+		if(DEV_ON) check(code);
+		return false;
 	}
 	
 	public static void queueWaitIdle(VkQueue queue){
@@ -481,7 +483,6 @@ public class Vk{
 	}
 	
 	public static long allocateDescriptorSets(VkGpuCtx ctx, VkDescriptorSetAllocateInfo info, LongBuffer dest){
-		
 		int code=vkAllocateDescriptorSets(ctx.getDevice(), info, dest);
 		if(DEV_ON) check(code);
 		return dest.get(0);

@@ -1,13 +1,13 @@
 package com.lapissea.vulkanimpl.util.types;
 
 import com.lapissea.vec.color.ColorM;
-import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkClearValue;
+import org.lwjgl.vulkan.VkExtent2D;
 import org.lwjgl.vulkan.VkRenderPassBeginInfo;
 
 import static org.lwjgl.system.MemoryStack.*;
@@ -23,7 +23,7 @@ public class VkRenderPass implements VkDestroyable, VkGpuCtx{
 		this.handle=handle;
 	}
 	
-	public void begin(VkCommandBufferM cmd, long frameBuffer, IVec2iR size, ColorM clearColor){
+	public void begin(VkCommandBufferM cmd, long frameBuffer, VkExtent2D size, ColorM clearColor){
 		try(MemoryStack stack=stackPush()){
 			
 			VkRenderPassBeginInfo renderPassInfo=VkRenderPassBeginInfo.callocStack(stack);
@@ -31,7 +31,7 @@ public class VkRenderPass implements VkDestroyable, VkGpuCtx{
 			              .renderPass(handle)
 			              .framebuffer(frameBuffer);
 			renderPassInfo.renderArea().offset().set(0, 0);
-			renderPassInfo.renderArea().extent().set(size.x(), size.y());
+			renderPassInfo.renderArea().extent(size);
 			VkClearValue.Buffer clearColorBuff=VkClearValue.callocStack(1, stack);
 			clearColorBuff.get(0).color()
 			              .float32(0, clearColor.r())

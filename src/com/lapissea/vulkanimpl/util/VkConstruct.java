@@ -20,8 +20,8 @@ public class VkConstruct{
 		return VkBufferCreateInfo.calloc().sType(VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO);
 	}
 	
-	public static VkMemoryAllocateInfo memoryAllocateInfo(MemoryStack stack){
-		return VkMemoryAllocateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO);
+	public static VkMemoryAllocateInfo memoryAllocateInfo(){
+		return VkMemoryAllocateInfo.calloc().sType(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO);
 	}
 	
 	public static VkCommandBufferBeginInfo commandBufferBeginInfo(MemoryStack stack){
@@ -78,5 +78,17 @@ public class VkConstruct{
 	
 	public static VkPresentInfoKHR presentInfoKHR(){
 		return VkPresentInfoKHR.calloc().sType(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR);
+	}
+	
+	public static VkImageCreateInfo imageCreateInfo(){
+		return VkImageCreateInfo.calloc().sType(VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO);
+	}
+	
+	public static VkImageMemoryBarrier.Buffer imageMemoryBarrier(MemoryStack stack, int count){
+		VkImageMemoryBarrier.Buffer buff=VkImageMemoryBarrier.callocStack(count, stack);
+		for(int i=0;i<count;i++){
+			buff.get(i).sType(VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER);
+		}
+		return buff;
 	}
 }
