@@ -9,6 +9,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
 
 public class VkFormatInfo{
 	
@@ -105,10 +106,20 @@ public class VkFormatInfo{
 		       '}';
 	}
 	
-	private static final TIntObjectHashMap<VkFormatInfo> INFO=new TIntObjectHashMap<>();
+	private static class Map extends TIntObjectHashMap<VkFormatInfo>{
+		Object[] valuesDirect(){
+			return _values;
+		}
+	}
+	
+	private static final Map INFO=new Map();
 	
 	public static VkFormatInfo get(int format){
 		return INFO.get(format);
+	}
+	
+	public static Stream<VkFormatInfo> stream(){
+		return Stream.of(INFO.valuesDirect()).limit(INFO.size()).map(o->(VkFormatInfo)o);
 	}
 	
 	static{

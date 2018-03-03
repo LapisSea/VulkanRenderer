@@ -15,8 +15,12 @@ import org.lwjgl.vulkan.*;
 
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static org.lwjgl.system.MemoryStack.*;
@@ -83,6 +87,22 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		}
 	}
 	
+	public class FormatProps{
+		
+		public final VkFormatInfo format;
+		
+		public final int linearTiling;
+		public final int optimalTiling;
+		public final int buffer;
+		
+		public FormatProps(VkFormatInfo format, int linearTiling, int optimalTiling, int buffer){
+			this.format=format;
+			this.linearTiling=linearTiling;
+			this.optimalTiling=optimalTiling;
+			this.buffer=buffer;
+		}
+	}
+	
 	private final VulkanCore instance;
 	
 	private final VkPhysicalDevice physicalDevice;
@@ -97,7 +117,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	private Queue                          graphicsQueue;
 	private SurfaceQu                      surfaceQueue;
 	private Queue                          transferQueue;
-	private CompletableFuture<VkFormatInfo[]> supportedFormats;
+	private Supplier<FormatProps[]>        supportedFormats;
 	
 	public VkGpu(VulkanCore instance, VkPhysicalDevice physicalDevice){
 		this.instance=instance;
@@ -187,14 +207,26 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			logicalDevice=Vk.createDevice(physicalDevice, info, null, stack.mallocPointer(1));
 		}
 		
-		if(graphicsQueue!=null) 			graphicsQueue.init();
+		if(graphicsQueue!=null) graphicsQueue.init();
 		if(surfaceQueue!=null) surfaceQueue.init();
 		if(transferQueue!=null) transferQueue.init();
 		
-		supportedFormats=CompletableFuture.supplyAsync(()->{
-			return null;
+		CompletableFuture<FormatProps[]> fut=CompletableFuture.supplyAsync(()->{
+			try(VkFormatProperties props=VkFormatProperties.calloc()){
+				return VkFormatInfo.stream().map(format->{
+					vkGetPhysicalDeviceFormatProperties(physicalDevice, format.handle, props);
+					
+					if(props.linearTilingFeatures()==0&&props.optimalTilingFeatures()==0&&props.bufferFeatures()==0) return null;
+					return new FormatProps(format, props.linearTilingFeatures(), props.optimalTilingFeatures(), props.bufferFeatures());
+					
+				}).filter(Objects::nonNull).sorted(Comparator.comparingInt(a->a.format.handle)).toArray(FormatProps[]::new);
+			}
 		});
-		supportedFormats.get()
+		supportedFormats=()->{
+			FormatProps[] i=fut.join();
+			supportedFormats=()->i;
+			return i;
+		};
 		return true;
 	}
 	
@@ -383,4 +415,13 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		}
 	}
 	
+	public FormatProps getSupportedFormat(int format){
+		FormatProps[] formats=supportedFormats.get();
+		
+		int pos=Arrays.binarySearch(formats, null, (a, b)->Integer.compare(a.format.handle, format));
+		if(pos<0) return null;
+		
+		FormatProps fp=formats[pos];
+		return fp.format.handle==format?fp:null;
+	}
 }
