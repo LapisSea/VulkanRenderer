@@ -7,11 +7,8 @@ layout(location = 2) in float bulge;
 
 layout(location = 0) out vec4 fragmentColor;
 
+layout(binding = 1) uniform sampler2D texSampler;
+
 void main() {
-	float siz=1000;
-	float angle=atan(-uv.y,uv.x);
-	if(angle<0)angle=3.14*2+angle;
-	float length=pow(length(uv),1+bulge)/2;
-	float lel=sin(length*siz*sin(angle)+3.14/2)*cos(length*siz*cos(angle));
-    fragmentColor = color*max(lel,0);
+    fragmentColor = texture(texSampler, uv);
 }

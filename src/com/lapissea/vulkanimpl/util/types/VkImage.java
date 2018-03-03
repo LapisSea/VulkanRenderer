@@ -32,7 +32,7 @@ public class VkImage implements VkDestroyable, VkGpuCtx{
 	
 	private final LongBuffer handle;
 	private final VkGpu      gpu;
-	private final int        currentLayout;
+	private       int        currentLayout;
 	private final VkExtent3D extent;
 	
 	public VkImage(LongBuffer handle, VkGpu gpu, int currentLayout, VkExtent3D extent){
@@ -85,17 +85,34 @@ public class VkImage implements VkDestroyable, VkGpuCtx{
 	}
 	
 	public void transitionLayout(VkGpu.Queue queue, VkCommandPool pool, int newLayout){
+		if(newLayout==currentLayout) return;
+		
 		try(MemoryStack stack=stackPush()){
 			VkImageMemoryBarrier.Buffer barriers=VkConstruct.imageMemoryBarrier(stack, 1);
 			
-			int srcStageMask, srcAccessMask, dstStageMask, dstAccessMask;
+			int srcStageMask, dstStageMask,
+				srcAccessMask, dstAccessMask;
 			
 			switch(1<<currentLayout|1<<newLayout){
+			
 			case 1<<VK_IMAGE_LAYOUT_UNDEFINED|1<<VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:{
 				srcAccessMask=0;
-				dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+				dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
+				
+				srcStageMask=VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+				dstStageMask=VK_PIPELINE_STAGE_TRANSFER_BIT;
 			} break;
-			default:throw new IllegalArgumentException("Unknown combination: "+currentLayout+"/"+newLayout);
+			
+			case 1<<VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL|1<<VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:{
+				srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
+				dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
+				
+				srcStageMask=VK_PIPELINE_STAGE_TRANSFER_BIT;
+				dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			} break;
+			
+			default:
+				throw new IllegalArgumentException("Unknown combination: "+currentLayout+"/"+newLayout);
 			}
 			
 			VkImageMemoryBarrier barrier=barriers.get(0);
@@ -111,6 +128,7 @@ public class VkImage implements VkDestroyable, VkGpuCtx{
 			try(SingleUseCommandBuffer su=new SingleUseCommandBuffer(queue, pool)){
 				su.commandBuffer.pipelineBarrier(srcStageMask, dstStageMask, 0, barriers);
 			}
+			
 			currentLayout=newLayout;
 		}
 		

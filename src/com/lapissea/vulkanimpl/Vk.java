@@ -488,6 +488,12 @@ public class Vk{
 		return dest.get(0);
 	}
 	
+	public static long createSampler(VkDevice device, VkSamplerCreateInfo info, LongBuffer dest){
+		int code=vkCreateSampler(device, info, null, dest);
+		if(DEV_ON) check(code);
+		return dest.get(0);
+	}
+	
 	/*/START_GEN/*/
 	//lel
 	

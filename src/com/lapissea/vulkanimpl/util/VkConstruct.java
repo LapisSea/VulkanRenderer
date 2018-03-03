@@ -91,4 +91,12 @@ public class VkConstruct{
 		}
 		return buff;
 	}
+	
+	public static VkSamplerCreateInfo samplerCreateInfo(){
+		return VkSamplerCreateInfo.calloc().sType(VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO);
+	}
+	
+	public static VkImageViewCreateInfo imageViewCreateInfo(){
+		return VkImageViewCreateInfo.calloc().sType(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
+	}
 }

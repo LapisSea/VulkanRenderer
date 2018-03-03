@@ -58,6 +58,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	private       int         colorSpace;
 	private       VkSemaphore imageAviable;
 	private       List<Frame> frames;
+	private       VkTexture   depth;
 	private final VkExtent2D extent=VkExtent2D.calloc();
 	
 	private IntBuffer acquireNextImageMem=memAllocInt(1);
@@ -125,7 +126,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		Vk.createSwapchainKHR(gpu, createInfo, handle);
 		
 		VkTexture[] colors=UtilL.convert(Vk.getSwapchainImagesKHR(gpu, this, stack), VkTexture[]::new,
-		                                 image->new VkTexture(image).createView(format.format(), VkImageAspect.COLOR));
+		                                 image->new VkTexture(image, null).createView(format.format(), VkImageAspect.COLOR));
 		List<Frame> frames0=new ArrayList<>(colors.length);
 		for(int i=0;i<colors.length;i++){
 			frames0.add(new Frame(i, colors[i], gpu.createSemaphore()));

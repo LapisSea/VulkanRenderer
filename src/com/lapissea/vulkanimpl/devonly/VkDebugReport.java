@@ -25,8 +25,31 @@ public class VkDebugReport{
 	
 	public VkDebugReport(VulkanCore renderer, List<Type> errTypes, List<Type> outTypes){
 		this(renderer, Stream.concat(errTypes.stream(), outTypes.stream()).collect(Collectors.toList()), (type, prefix, code, message)->{
-			if(message.startsWith("Device Extension")) return;
+//			if(message.startsWith("Device Extension")) return;
 			
+			if(message.startsWith("OBJ[")){
+				LogUtil.println(message);
+				StringBuilder id =new StringBuilder();
+				int           pos=4;
+				while(message.charAt(pos)!=']'){
+					id.append(message.charAt(pos++));
+				}
+				
+//				if(id.toString().equals("0x9"))throw new RuntimeException();
+		
+				if(message.substring(pos+4).startsWith("CREATE")){
+					StackTraceElement[] stack=Thread.currentThread().getStackTrace();
+					
+					int stackPos=0;
+					while(!stack[stackPos].isNativeMethod()) stackPos++;
+					while(stack[stackPos].getClassName().startsWith("org.lwjgl")) stackPos++;
+					while(stack[stackPos].getClassName().equals(Vk.class.getName())) stackPos++;
+					
+					LogUtil.println("\nCALLED @", stack[stackPos]);
+					
+				}
+//				System.exit(0);
+			}
 			List<String>  msgLin=TextUtil.wrapLongString(message, 100);
 			StringBuilder msg   =new StringBuilder().append(type).append(": [").append(prefix).append("] Code ").append(code).append(": ");
 			

@@ -2,7 +2,9 @@ package com.lapissea.vulkanimpl;
 
 import com.lapissea.datamanager.IDataManager;
 import com.lapissea.glfw.BuffUtil;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.event.change.ChangeRegistryBool;
 import com.lapissea.vec.Vec2f;
 import com.lapissea.vec.Vec2i;
@@ -20,6 +22,7 @@ import com.lapissea.vulkanimpl.shaders.VkShader;
 import com.lapissea.vulkanimpl.util.GlfwWindowVk;
 import com.lapissea.vulkanimpl.util.VkConstruct;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
+import com.lapissea.vulkanimpl.util.VkImageAspect;
 import com.lapissea.vulkanimpl.util.types.*;
 import org.joml.Matrix4f;
 import org.lwjgl.PointerBuffer;
@@ -92,10 +95,12 @@ public class VulkanCore implements VkDestroyable{
 	private VkCommandBufferM[] sceneCommandBuffers;
 	
 	private VkModel               model;
+	private VkTexture             modelTexture;
 	private VkUniform             mainUniform;
 	private VkDescriptorSetLayout uniformLayout;
 	private VkDescriptorPool      descriptorPool;
 	private long                  descriptorSet;
+	
 	
 	private       VulkanRender renderer    =new VulkanRender();
 	private final Object       recreateLock=new Object();
@@ -124,15 +129,16 @@ public class VulkanCore implements VkDestroyable{
 		}
 		
 		if(DEV_ON){
-			debugReport=new VkDebugReport(this, List.of(ERROR, WARNING, PERFORMANCE_WARNING), List.of());
+			debugReport=new VkDebugReport(this, List.of(ERROR, WARNING, PERFORMANCE_WARNING), List.of(/*INFORMATION*/));
 		}
 		
 		surface=window.createSurface(this);
 		intGpus();
-		initUniform();
-		initTexture();
+		modelTexture=loadTexture("Birdy");
 		initModel();
+		initUniform();
 		initSurfaceDependant();
+		
 		Vec2i prevPos=new Vec2i(window.mousePos);
 		window.mousePos.register(e->{
 			bulge+=Math.sqrt(e.getSource().distanceTo(prevPos))/20;
@@ -140,35 +146,38 @@ public class VulkanCore implements VkDestroyable{
 		});
 	}
 	
-	private void initTexture(){
+	private VkTexture loadTexture(String name){
+		BufferedImage image;
 		try{
-			BufferedImage image=ImageIO.read(assets.getInStream("textures/SmugDude.png"));
-			
-			int width =image.getWidth();
-			int height=image.getHeight();
-			
-			ByteBuffer buff=BuffUtil.imageToBuffer(image, memAlloc(width*height*4));
-			
-			VkBuffer       stagingBuffer=renderGpu.createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, buff.capacity());
-			VkDeviceMemory stagingMemory=stagingBuffer.createMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-			
-			stagingMemory.memorySession(stagingBuffer.size, mem->{
-				mem.put(buff);
-				memFree(buff);
-			});
-			
-			VkImage textureImage=renderGpu.create2DImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT);
-			
-			VkDeviceMemory textureImageMemory=textureImage.createMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-			
-			textureImage.transitionLayout(renderGpu.getTransferQueue(), transferPool, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-			textureImage.copyFromBuffer(renderGpu.getTransferQueue(), transferPool, stagingBuffer);
-			textureImage.transitionLayout(renderGpu.getTransferQueue(), transferPool, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			
+			image=ImageIO.read(assets.getInStream("textures/"+name+".png"));
 		}catch(IOException e){
-			e.printStackTrace();
-			System.exit(0);
+			throw UtilL.uncheckedThrow(e);
 		}
+		
+		int width =image.getWidth();
+		int height=image.getHeight();
+		
+		ByteBuffer buff=BuffUtil.imageToBuffer(image, memAlloc(width*height*4));
+		
+		VkBuffer       stagingBuffer=renderGpu.createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, buff.capacity());
+		VkDeviceMemory stagingMemory=stagingBuffer.createMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		
+		stagingMemory.memorySession(stagingBuffer.size, mem->{
+			mem.put(buff);
+			memFree(buff);
+		});
+		
+		VkImage textureImage=renderGpu.create2DImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT);
+		
+		VkDeviceMemory textureImageMemory=textureImage.createMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		
+		textureImage.transitionLayout(renderGpu.getTransferQueue(), transferPool, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		textureImage.copyFromBuffer(renderGpu.getTransferQueue(), transferPool, stagingBuffer);
+		textureImage.transitionLayout(renderGpu.getGraphicsQueue(), graphicsPool, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		
+		stagingMemory.destroy();
+		stagingBuffer.destroy();
+		return new VkTexture(textureImage, textureImageMemory).createView(VK_FORMAT_R8G8B8A8_UNORM, VkImageAspect.COLOR).createSampler();
 	}
 	
 	private void initUniform(){
@@ -177,11 +186,15 @@ public class VulkanCore implements VkDestroyable{
 			int matrixSize=floatSize*16;
 			mainUniform=new VkUniform(renderGpu, matrixSize*3+floatSize, this::updateUniforms);
 			
-			uniformLayout=renderGpu.createDescriptorSetLayout(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
+			uniformLayout=renderGpu.createDescriptorSetLayout(VK_SHADER_STAGE_VERTEX_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			                                                  VK_SHADER_STAGE_FRAGMENT_BIT, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 			
-			VkDescriptorPoolSize.Buffer poolSize=VkDescriptorPoolSize.callocStack(1);
+			VkDescriptorPoolSize.Buffer poolSize=VkDescriptorPoolSize.callocStack(2);
 			poolSize.get(0)
 			        .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+			        .descriptorCount(1);
+			poolSize.get(1)
+			        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
 			        .descriptorCount(1);
 			
 			VkDescriptorPoolCreateInfo poolInfo=VkConstruct.descriptorPoolCreateInfo(stack);
@@ -194,7 +207,11 @@ public class VulkanCore implements VkDestroyable{
 			VkDescriptorBufferInfo.Buffer bufferInfo=VkDescriptorBufferInfo.callocStack(1, stack);
 			mainUniform.put(bufferInfo.get(0));
 			
-			VkWriteDescriptorSet.Buffer descriptorWrite=VkWriteDescriptorSet.callocStack(1, stack);
+			VkDescriptorImageInfo.Buffer imageInfo=VkDescriptorImageInfo.callocStack(1, stack);
+			modelTexture.put(imageInfo.get(0));
+			
+			
+			VkWriteDescriptorSet.Buffer descriptorWrite=VkWriteDescriptorSet.callocStack(2, stack);
 			descriptorWrite.get(0)
 			               .sType(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET)
 			               .dstSet(descriptorSet)
@@ -202,6 +219,13 @@ public class VulkanCore implements VkDestroyable{
 			               .pBufferInfo(bufferInfo)
 			               .dstBinding(0)
 			               .dstArrayElement(0);
+			descriptorWrite.get(1)
+			               .sType(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET)
+			               .dstSet(descriptorSet)
+			               .descriptorType(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+			               .dstBinding(1)
+			               .dstArrayElement(0)
+			               .pImageInfo(imageInfo);
 			
 			vkUpdateDescriptorSets(renderGpu.getDevice(), descriptorWrite, null);
 		}
@@ -215,25 +239,25 @@ public class VulkanCore implements VkDestroyable{
 		
 		float farPlane=1000;
 		
-		Matrix4f model=new Matrix4f();
-		Matrix4f view =new Matrix4f();
-		Matrix4f proj =new Matrix4f();
+		Matrix4f model     =new Matrix4f();
+		Matrix4f view      =new Matrix4f();
+		Matrix4f projection=new Matrix4f();
 		
 		double tim  =System.currentTimeMillis()/500D;
 		Vec2f  mouse=new Vec2f(window.mousePos).div(window.size).sub(0.5F);
 		
 		model.rotate((float)((tim/2)%(Math.PI*2)), 0, 0, 1).scale(2F);
-		view.lookAt(0, 2, -3,
+		view.lookAt(mouse.x()*5, 2, -mouse.y()*10,
 		            0, 0, 0,
 		            0, 0, 1);
-		proj.perspective((float)Math.toRadians(80), window.size.divXY(), 0.001F, farPlane, true);
+		projection.perspective((float)Math.toRadians(80), window.size.divXY(), 0.001F, farPlane, true);
 		
 		FloatBuffer uniformsF=uniforms.asFloatBuffer();
 		
 		int matrixSize=16;
 		model.get(0, uniformsF);
 		view.get(matrixSize, uniformsF);
-		proj.get(matrixSize*2, uniformsF);
+		projection.get(matrixSize*2, uniformsF);
 		uniformsF.put(matrixSize*3, (float)Math.sqrt(bulge));
 	}
 	
@@ -404,6 +428,7 @@ public class VulkanCore implements VkDestroyable{
 				                 gpu.getTransferQueue()==null) return false;
 				
 				              VkPhysicalDeviceFeatures features=gpu.getPhysicalFeatures();
+				
 				              return features.geometryShader()&&
 				                     features.shaderClipDistance()&&
 				                     features.shaderTessellationAndGeometryPointSize()&&
@@ -425,12 +450,14 @@ public class VulkanCore implements VkDestroyable{
 
 //			if(renderGpu==computeGpu){
 			renderGpu.init(null, Vk.stringsToPP(Stream.concat(renderExtensions.stream(), computeExtensions.stream()).distinct().collect(Collectors.toList()), stack));
-			graphicsPool=renderGpu.getGraphicsQueue().createCommandPool();
-			transferPool=renderGpu.getTransferQueue().createCommandPool();
+			LogUtil.println("Using GPU called", renderGpu.getPhysicalProperties().deviceNameString(),"as render device");
 //			}else{
 //				renderGpu.init(null, Vk.stringsToPP(renderExtensions, stack));
 //				computeGpu.init(null, Vk.stringsToPP(computeExtensions, stack));
 //			}
+			
+			graphicsPool=renderGpu.getGraphicsQueue().createCommandPool();
+			transferPool=renderGpu.getTransferQueue().createCommandPool();
 		}
 	}
 	
@@ -440,6 +467,7 @@ public class VulkanCore implements VkDestroyable{
 		
 		state.setViewport(window.size);
 		state.setInput(new VkPipelineInput(format));
+		state.setCullMode(VkShader.Cull.NONE);
 		try(MemoryStack stack=stackPush()){
 			shader.init(state, renderPass, stack.longs(uniformLayout.getHandle()));
 		}
@@ -472,6 +500,7 @@ public class VulkanCore implements VkDestroyable{
 		surface.destroy();
 		
 		model.destroy();
+		modelTexture.destroy();
 		
 		uniformLayout.destroy();
 		mainUniform.destroy();

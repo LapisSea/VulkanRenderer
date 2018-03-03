@@ -4,6 +4,7 @@ import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 import com.lapissea.vulkanimpl.util.VkConstruct;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
+import com.lapissea.vulkanimpl.util.format.VkFormatInfo;
 import com.lapissea.vulkanimpl.util.types.*;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -15,6 +16,7 @@ import org.lwjgl.vulkan.*;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import static org.lwjgl.system.MemoryStack.*;
@@ -95,7 +97,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	private Queue                          graphicsQueue;
 	private SurfaceQu                      surfaceQueue;
 	private Queue                          transferQueue;
-	
+	private CompletableFuture<VkFormatInfo[]> supportedFormats;
 	
 	public VkGpu(VulkanCore instance, VkPhysicalDevice physicalDevice){
 		this.instance=instance;
@@ -173,7 +175,8 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			}
 			
 			VkPhysicalDeviceFeatures deviceFeatures=VkPhysicalDeviceFeatures.callocStack(stack);
-			deviceFeatures.samplerAnisotropy(false);
+			
+			deviceFeatures.samplerAnisotropy(true);
 			
 			VkDeviceCreateInfo info=VkDeviceCreateInfo.callocStack(stack);
 			info.sType(VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO)
@@ -184,10 +187,14 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			logicalDevice=Vk.createDevice(physicalDevice, info, null, stack.mallocPointer(1));
 		}
 		
-		if(graphicsQueue!=null) graphicsQueue.init();
+		if(graphicsQueue!=null) 			graphicsQueue.init();
 		if(surfaceQueue!=null) surfaceQueue.init();
 		if(transferQueue!=null) transferQueue.init();
 		
+		supportedFormats=CompletableFuture.supplyAsync(()->{
+			return null;
+		});
+		supportedFormats.get()
 		return true;
 	}
 	
@@ -333,7 +340,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		}
 	}
 	
-	public VkDescriptorSetLayout createDescriptorSetLayout(int type, int stage, int... repeat){
+	public VkDescriptorSetLayout createDescriptorSetLayout(int stage, int type, int... repeat){
 		try(MemoryStack stack=stackPush()){
 			int                                 repeatCount     =repeat.length/2;
 			VkDescriptorSetLayoutBinding.Buffer uboLayoutBinding=VkDescriptorSetLayoutBinding.calloc(1+repeatCount);
@@ -346,9 +353,9 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			for(int i=0;i<repeatCount;i++){
 				uboLayoutBinding.get(i+1)
 				                .binding(i+1)
-				                .descriptorType(repeat[i*2])
+				                .descriptorType(repeat[i*2+1])
 				                .descriptorCount(1)
-				                .stageFlags(repeat[i*2+1]);
+				                .stageFlags(repeat[i*2]);
 			}
 			layoutInfo.pBindings(uboLayoutBinding);
 			return Vk.createDescriptorSetLayout(this, layoutInfo);
