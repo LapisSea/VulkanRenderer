@@ -94,6 +94,13 @@ public class VkFormatInfo{
 		return writer;
 	}
 	
+	public boolean hasComponentType(ComponentType type){
+		for(Component component : components){
+			if(component.type==type) return true;
+		}
+		return false;
+	}
+	
 	@Override
 	public String toString(){
 		return "Info{"+

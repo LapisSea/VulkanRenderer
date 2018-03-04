@@ -7,7 +7,6 @@ import com.lapissea.vulkanimpl.renderer.model.VkModel.IndexType;
 import com.lapissea.vulkanimpl.util.format.VKFormatWriter;
 import com.lapissea.vulkanimpl.util.format.VkFormatInfo;
 import com.lapissea.vulkanimpl.util.types.VkBuffer;
-import com.lapissea.vulkanimpl.util.types.VkCommandPool;
 import com.lapissea.vulkanimpl.util.types.VkDeviceMemory;
 
 import java.lang.ref.SoftReference;
@@ -190,7 +189,7 @@ public class VkModelBuilder{
 	}
 	
 	
-	public VkModel bake(VkGpu gpu, VkCommandPool transferPool){
+	public VkModel bake(VkGpu gpu){
 		if(vertex.position()!=0) throw new IllegalStateException("Vertex not finished ");
 		
 		
@@ -230,7 +229,7 @@ public class VkModelBuilder{
 		VkBuffer       modelBuffer=gpu.createBuffer(usage, totalSize);
 		VkDeviceMemory modelMemory=modelBuffer.createMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		
-		modelBuffer.copyFrom(stagingBuffer, 0, transferPool);
+		modelBuffer.copyFrom(stagingBuffer, 0, gpu.getTransferQueue().getPool());
 		
 		stagingBuffer.destroy();
 		stagingMemory.destroy();

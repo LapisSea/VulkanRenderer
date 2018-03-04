@@ -90,8 +90,6 @@ public class VulkanCore implements VkDestroyable{
 	private Settings settings=new Settings();
 	public IDataManager assets;
 	
-	private VkCommandPool      graphicsPool;
-	private VkCommandPool      transferPool;
 	private VkCommandBufferM[] sceneCommandBuffers;
 	
 	private VkModel               model;
@@ -171,9 +169,9 @@ public class VulkanCore implements VkDestroyable{
 		
 		VkDeviceMemory textureImageMemory=textureImage.createMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		
-		textureImage.transitionLayout(renderGpu.getTransferQueue(), transferPool, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-		textureImage.copyFromBuffer(renderGpu.getTransferQueue(), transferPool, stagingBuffer);
-		textureImage.transitionLayout(renderGpu.getGraphicsQueue(), graphicsPool, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		textureImage.transitionLayout(renderGpu.getTransferQueue(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		textureImage.copyFromBuffer(renderGpu.getTransferQueue(), stagingBuffer);
+		textureImage.transitionLayout(renderGpu.getGraphicsQueue(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		
 		stagingMemory.destroy();
 		stagingBuffer.destroy();
@@ -290,20 +288,20 @@ public class VulkanCore implements VkDestroyable{
 			3, 6, 7
 		                       );
 		
-		model=modelBuilder.bake(renderGpu, transferPool);
+		model=modelBuilder.bake(renderGpu);
 	}
 	
 	private void initSurfaceDependant(){
 		swapchain=new VkSwapchain(renderGpu, surface, window.size);
-		renderPass=createRenderPass();
-		shader=createGraphicsPipeline(model.getFormat());
+		renderPass=swapchain.createRenderPass();
 		swapchain.initFrameBuffers(renderPass);
+		shader=createGraphicsPipeline(model.getFormat());
 		initScene();
 	}
 	
 	private void initScene(){
 		
-		sceneCommandBuffers=graphicsPool.allocateCommandBuffers(swapchain.getFrames().size());
+		sceneCommandBuffers=renderGpu.getGraphicsQueue().getPool().allocateCommandBuffers(swapchain.getFrames().size());
 		for(VkSwapchain.Frame frame : swapchain.getFrames()){
 			VkCommandBufferM sceneBuffer=sceneCommandBuffers[frame.index];
 			
@@ -322,51 +320,6 @@ public class VulkanCore implements VkDestroyable{
 			sceneBuffer.endRenderPass();
 			sceneBuffer.end();
 		}
-	}
-	
-	private VkRenderPass createRenderPass(){
-		
-		try(MemoryStack stack=stackPush()){
-			
-			VkAttachmentDescription.Buffer attachments=VkAttachmentDescription.callocStack(1, stack);
-			attachments.get(0)//color attachment
-			           .format(swapchain.getFormat()).samples(VK_SAMPLE_COUNT_1_BIT)
-			           .loadOp(VK_ATTACHMENT_LOAD_OP_CLEAR)
-			           .storeOp(VK_ATTACHMENT_STORE_OP_STORE)
-			           .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
-			           .stencilStoreOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
-			           .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
-			           .finalLayout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-			
-			VkAttachmentReference.Buffer colorAttachmentRef=VkAttachmentReference.callocStack(1, stack);
-			colorAttachmentRef.get(0) //fragment out color
-			                  .attachment(0)
-			                  .layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-			
-			VkSubpassDescription.Buffer subpasses=VkSubpassDescription.callocStack(1, stack);
-			subpasses.get(0)
-			         .pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
-			         .colorAttachmentCount(colorAttachmentRef.limit())
-			         .pColorAttachments(colorAttachmentRef);
-			
-			
-			VkSubpassDependency.Buffer dependency=VkSubpassDependency.callocStack(1, stack);
-			dependency.get(0)
-			          .srcSubpass(VK_SUBPASS_EXTERNAL)
-			          .dstSubpass(0)
-			          .srcStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)//wait for swapchain to bake reading the image that is presented
-			          .srcAccessMask(0)
-			          .dstStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
-			          .dstAccessMask(VK_ACCESS_COLOR_ATTACHMENT_READ_BIT|VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-			
-			VkRenderPassCreateInfo renderPassInfo=VkRenderPassCreateInfo.callocStack(stack);
-			renderPassInfo.sType(VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO)
-			              .pAttachments(attachments)
-			              .pSubpasses(subpasses)
-			              .pDependencies(dependency);
-			return Vk.createRenderPass(renderGpu, renderPassInfo, stack.mallocLong(1));
-		}
-		
 	}
 	
 	private void validateList(List<String> supported, List<String> requested, String type){
@@ -450,14 +403,12 @@ public class VulkanCore implements VkDestroyable{
 
 //			if(renderGpu==computeGpu){
 			renderGpu.init(null, Vk.stringsToPP(Stream.concat(renderExtensions.stream(), computeExtensions.stream()).distinct().collect(Collectors.toList()), stack));
-			LogUtil.println("Using GPU called", renderGpu.getPhysicalProperties().deviceNameString(),"as render device");
+			LogUtil.println("Using GPU called", renderGpu.getPhysicalProperties().deviceNameString(), "as render device");
 //			}else{
 //				renderGpu.init(null, Vk.stringsToPP(renderExtensions, stack));
 //				computeGpu.init(null, Vk.stringsToPP(computeExtensions, stack));
 //			}
 			
-			graphicsPool=renderGpu.getGraphicsQueue().createCommandPool();
-			transferPool=renderGpu.getTransferQueue().createCommandPool();
 		}
 	}
 	
@@ -507,8 +458,6 @@ public class VulkanCore implements VkDestroyable{
 		
 		descriptorPool.destroy();
 		
-		graphicsPool.destroy();
-		transferPool.destroy();
 		renderGpu.destroy();
 		
 		renderer.destroy();

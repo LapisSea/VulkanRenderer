@@ -99,4 +99,8 @@ public class VkConstruct{
 	public static VkImageViewCreateInfo imageViewCreateInfo(){
 		return VkImageViewCreateInfo.calloc().sType(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
 	}
+	
+	public static VkPipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo(MemoryStack stack){
+		return VkPipelineDepthStencilStateCreateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO);
+	}
 }

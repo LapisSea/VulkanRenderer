@@ -1,6 +1,5 @@
 package com.lapissea.vulkanimpl;
 
-import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 import com.lapissea.vulkanimpl.util.VkConstruct;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
@@ -22,7 +21,9 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
@@ -31,18 +32,20 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	
 	public class Queue{
 		
-		protected    VkQueue queue;
-		public final int     id;
+		protected    VkQueue       queue;
+		public final int           id;
+		private      VkCommandPool pool;
 		
 		public Queue(int id){
 			this.id=id;
 		}
 		
 		protected void init(){
-			if(DevelopmentInfo.DEV_ON&&getDevice()==null) throw new IllegalStateException("Gpu not initialized");
+			if(DEV_ON&&getDevice()==null) throw new IllegalStateException("Gpu not initialized");
 			try(MemoryStack stack=stackPush()){
 				queue=Vk.createDeviceQueue(getDevice(), id, 0, stack.callocPointer(1));
 			}
+			pool=createCommandPool();
 		}
 		
 		public VkCommandPool createCommandPool(){
@@ -74,6 +77,13 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			return this;
 		}
 		
+		public VkCommandPool getPool(){
+			return pool;
+		}
+		
+		public void destroy(){
+			pool.destroy();
+		}
 	}
 	
 	public class SurfaceQu extends Queue{
@@ -100,6 +110,16 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			this.linearTiling=linearTiling;
 			this.optimalTiling=optimalTiling;
 			this.buffer=buffer;
+		}
+		
+		public boolean checkFeatures(int tiling, int features){
+			if(tiling==VK_IMAGE_TILING_LINEAR){
+				return (linearTiling&features)==features;
+			}
+			
+			if(DEV_ON&&tiling!=VK_IMAGE_TILING_OPTIMAL) throw new RuntimeException();
+			
+			return (optimalTiling&features)==features;
 		}
 	}
 	
@@ -168,8 +188,8 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		}
 	}
 	
-	public boolean init(PointerBuffer layers, PointerBuffer extensions){
-		if(logicalDevice!=null) return false;
+	public void init(PointerBuffer layers, PointerBuffer extensions){
+		if(logicalDevice!=null) return;
 		
 		try(MemoryStack stack=stackPush()){
 			
@@ -211,6 +231,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		if(surfaceQueue!=null) surfaceQueue.init();
 		if(transferQueue!=null) transferQueue.init();
 		
+		
 		CompletableFuture<FormatProps[]> fut=CompletableFuture.supplyAsync(()->{
 			try(VkFormatProperties props=VkFormatProperties.calloc()){
 				return VkFormatInfo.stream().map(format->{
@@ -227,11 +248,14 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			supportedFormats=()->i;
 			return i;
 		};
-		return true;
 	}
 	
 	@Override
 	public void destroy(){
+		
+		if(graphicsQueue!=null) graphicsQueue.destroy();
+		if(surfaceQueue!=null) surfaceQueue.destroy();
+		if(transferQueue!=null) transferQueue.destroy();
 		
 		if(logicalDevice!=null){
 			vkDestroyDevice(logicalDevice, null);
@@ -413,6 +437,10 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			
 			return VkImage.create(this, imageInfo);
 		}
+	}
+	
+	public Stream<FormatProps> supportedFormats(){
+		return Stream.of(supportedFormats.get());
 	}
 	
 	public FormatProps getSupportedFormat(int format){

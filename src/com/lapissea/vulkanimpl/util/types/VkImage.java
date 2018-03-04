@@ -1,5 +1,6 @@
 package com.lapissea.vulkanimpl.util.types;
 
+import com.lapissea.util.LogUtil;
 import com.lapissea.vulkanimpl.SingleUseCommandBuffer;
 import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
@@ -7,6 +8,7 @@ import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 import com.lapissea.vulkanimpl.util.VkConstruct;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
+import com.lapissea.vulkanimpl.util.format.VkFormatInfo;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
@@ -23,23 +25,25 @@ public class VkImage implements VkDestroyable, VkGpuCtx{
 		try{
 			int code=vkCreateImage(gpu.getDevice(), info, null, handle);
 			if(DevelopmentInfo.DEV_ON) Vk.check(code);
-			return new VkImage(handle, gpu, info.initialLayout(), VkExtent3D.malloc().set(info.extent()));
+			return new VkImage(handle, gpu, info.initialLayout(), VkExtent3D.malloc().set(info.extent()), VkFormatInfo.get(info.format()));
 		}catch(Throwable t){
 			memFree(handle);
 			throw t;
 		}
 	}
 	
-	private final LongBuffer handle;
-	private final VkGpu      gpu;
-	private       int        currentLayout;
-	private final VkExtent3D extent;
+	private final LongBuffer   handle;
+	private final VkGpu        gpu;
+	private       int          currentLayout;
+	private final VkExtent3D   extent;
+	private final VkFormatInfo format;
 	
-	public VkImage(LongBuffer handle, VkGpu gpu, int currentLayout, VkExtent3D extent){
+	public VkImage(LongBuffer handle, VkGpu gpu, int currentLayout, VkExtent3D extent, VkFormatInfo format){
 		this.handle=handle;
 		this.gpu=gpu;
 		this.currentLayout=currentLayout;
 		this.extent=extent;
+		this.format=format;
 	}
 	
 	public VkMemoryRequirements getMemRequirements(MemoryStack stack){
@@ -84,14 +88,15 @@ public class VkImage implements VkDestroyable, VkGpuCtx{
 		return mem;
 	}
 	
-	public void transitionLayout(VkGpu.Queue queue, VkCommandPool pool, int newLayout){
+	public void transitionLayout(VkGpu.Queue queue, int newLayout){
 		if(newLayout==currentLayout) return;
 		
 		try(MemoryStack stack=stackPush()){
 			VkImageMemoryBarrier.Buffer barriers=VkConstruct.imageMemoryBarrier(stack, 1);
 			
 			int srcStageMask, dstStageMask,
-				srcAccessMask, dstAccessMask;
+				srcAccessMask, dstAccessMask,
+				aspectMask;
 			
 			switch(1<<currentLayout|1<<newLayout){
 			
@@ -111,9 +116,30 @@ public class VkImage implements VkDestroyable, VkGpuCtx{
 				dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 			} break;
 			
+			case 1<<VK_IMAGE_LAYOUT_UNDEFINED|1<<VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:{
+				srcAccessMask=0;
+				dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT|VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				
+				srcStageMask=VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+				dstStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+			} break;
+			
 			default:
 				throw new IllegalArgumentException("Unknown combination: "+currentLayout+"/"+newLayout);
 			}
+			
+			LogUtil.println(format.name, format.components.stream().map(f->f.type).toArray(VkFormatInfo.ComponentType[]::new));
+			
+			if(newLayout==VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL){
+				aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT;
+				
+				if(format.hasComponentType(VkFormatInfo.ComponentType.STENCIL)){
+					aspectMask|=VK_IMAGE_ASPECT_STENCIL_BIT;
+				}
+			}else{
+				aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;
+			}
+			
 			
 			VkImageMemoryBarrier barrier=barriers.get(0);
 			barrier.oldLayout(currentLayout)
@@ -123,9 +149,9 @@ public class VkImage implements VkDestroyable, VkGpuCtx{
 			       .image(getHandle())
 			       .srcAccessMask(srcAccessMask)
 			       .dstAccessMask(dstAccessMask);
-			barrier.subresourceRange().set(VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1); ;
+			barrier.subresourceRange().set(aspectMask, 0, 1, 0, 1); ;
 			
-			try(SingleUseCommandBuffer su=new SingleUseCommandBuffer(queue, pool)){
+			try(SingleUseCommandBuffer su=new SingleUseCommandBuffer(queue, queue.getPool())){
 				su.commandBuffer.pipelineBarrier(srcStageMask, dstStageMask, 0, barriers);
 			}
 			
@@ -134,13 +160,13 @@ public class VkImage implements VkDestroyable, VkGpuCtx{
 		
 	}
 	
-	public void copyFromBuffer(VkGpu.Queue queue, VkCommandPool pool, VkBuffer buffer){
+	public void copyFromBuffer(VkGpu.Queue queue, VkBuffer buffer){
 		try(VkOffset3D offset=VkOffset3D.calloc()){
-			copyFromBuffer(queue, pool, buffer, offset);
+			copyFromBuffer(queue, buffer, offset);
 		}
 	}
 	
-	public void copyFromBuffer(VkGpu.Queue queue, VkCommandPool pool, VkBuffer buffer, VkOffset3D offset){
+	public void copyFromBuffer(VkGpu.Queue queue, VkBuffer buffer, VkOffset3D offset){
 		try(VkBufferImageCopy.Buffer region=VkBufferImageCopy.calloc(1)){
 			
 			region.get(0)
@@ -156,7 +182,7 @@ public class VkImage implements VkDestroyable, VkGpuCtx{
 			      .baseArrayLayer(0)
 			      .layerCount(1);
 			
-			try(SingleUseCommandBuffer su=new SingleUseCommandBuffer(queue, pool)){
+			try(SingleUseCommandBuffer su=new SingleUseCommandBuffer(queue, queue.getPool())){
 				su.commandBuffer.copyBufferToImage(buffer, this, region);
 			}
 		}

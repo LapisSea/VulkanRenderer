@@ -25,6 +25,7 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	
+	
 	public class Frame{
 		private      long        frameBuffer;
 		private      VkTexture   colorFrame;
@@ -137,22 +138,52 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	
 	public void initFrameBuffers(VkRenderPass renderPass){
 		
+		int tiling=VK_IMAGE_TILING_OPTIMAL;
+		
+		VkImage        img=getGpu().create2DImage(extent.width(), extent.height(), findDepthFormat(tiling), tiling, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+		VkDeviceMemory mem=img.createMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		
+		img.transitionLayout(getGpu().getGraphicsQueue(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+		
+		depth=new VkTexture(img, mem);
+		
+		
+		initFrames(renderPass);
+	}
+	
+	private void initFrames(VkRenderPass renderPass){
+		
 		try(MemoryStack stack=stackPush()){
-			VkFramebufferCreateInfo framebufferInfo=VkFramebufferCreateInfo.callocStack(stack);
-			framebufferInfo.sType(VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO)
-			               .renderPass(renderPass.getHandle())
+			VkFramebufferCreateInfo framebufferInfo=VkFramebufferCreateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO);
+			
+			framebufferInfo.renderPass(renderPass.getHandle())
 			               .width(extent.width())
 			               .height(extent.height())
 			               .layers(1);
 			
-			LongBuffer lb=stack.mallocLong(1), view=stack.mallocLong(1);
-			for(Frame frame : frames){
-				frame.frameBuffer=Vk.createFrameBuffer(gpu, framebufferInfo.pAttachments(view.put(0, frame.colorFrame.getView())), lb);
-			}
 			
+			for(Frame frame : frames){
+				
+				framebufferInfo.pAttachments(stack.longs(frame.colorFrame.getView(), depth.getView()));
+				
+				frame.frameBuffer=Vk.createFrameBuffer(gpu, framebufferInfo, stack.mallocLong(1));
+			}
 		}
+		
 	}
 	
+	private int findDepthFormat(int tiling){
+		return findDepthFormat(tiling, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		                       VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT);
+	}
+	
+	private int findDepthFormat(int tiling, int features, int... acceptedFormats){
+		return getGpu().supportedFormats()
+		               .filter(f->UtilL.contains(acceptedFormats, f.format.handle)&&f.checkFeatures(tiling, features))
+		               .map(f->f.format.handle)
+		               .findFirst()
+		               .orElseThrow(()->new UnsupportedOperationException("Unable to find supported depth format"));
+	}
 	
 	private VkSurfaceFormatKHR chooseSwapSurfaceFormat(VkSurfaceFormatKHR.Buffer availableFormats){
 		if(availableFormats.capacity()==1&&availableFormats.position(0).format()==VK_FORMAT_UNDEFINED) return availableFormats.get(0);
@@ -194,6 +225,65 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		return id==-1?null:frames.get(id);
 	}
 	
+	public VkRenderPass createRenderPass(){
+		
+		
+		try(MemoryStack stack=stackPush()){
+			VkAttachmentDescription.Buffer attachments=VkAttachmentDescription.callocStack(2, stack);
+			attachments.get(0)//color attachment
+			           .format(getFormat())
+			           .samples(VK_SAMPLE_COUNT_1_BIT)
+			           .loadOp(VK_ATTACHMENT_LOAD_OP_CLEAR)
+			           .storeOp(VK_ATTACHMENT_STORE_OP_STORE)
+			           .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+			           .stencilStoreOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
+			           .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
+			           .finalLayout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+			attachments.get(1)//depth attachment
+			           .format(findDepthFormat(VK_IMAGE_TILING_OPTIMAL))
+			           .samples(VK_SAMPLE_COUNT_1_BIT)
+			           .loadOp(VK_ATTACHMENT_LOAD_OP_CLEAR)
+			           .storeOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
+			           .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+			           .stencilStoreOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
+			           .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
+			           .finalLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+			
+			VkAttachmentReference.Buffer colorAttachmentRef=VkAttachmentReference.callocStack(1, stack);
+			colorAttachmentRef.get(0) //fragment out color
+			                  .attachment(0)
+			                  .layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			
+			VkAttachmentReference depthAttachmentRef=VkAttachmentReference.callocStack(stack);
+			depthAttachmentRef.attachment(1)
+			                  .layout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+			
+			VkSubpassDescription.Buffer subpasses=VkSubpassDescription.callocStack(1, stack);
+			subpasses.get(0)
+			         .pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
+			         .colorAttachmentCount(colorAttachmentRef.limit())
+			         .pColorAttachments(colorAttachmentRef)
+			         .pDepthStencilAttachment(depthAttachmentRef);
+			
+			VkSubpassDependency.Buffer dependency=VkSubpassDependency.callocStack(1, stack);
+			dependency.get(0)
+			          .srcSubpass(VK_SUBPASS_EXTERNAL)
+			          .dstSubpass(0)
+			          .srcStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)//wait for swapchain to bake reading the image that is presented
+			          .srcAccessMask(0)
+			          .dstStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+			          .dstAccessMask(VK_ACCESS_COLOR_ATTACHMENT_READ_BIT|VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+			
+			VkRenderPassCreateInfo renderPassInfo=VkRenderPassCreateInfo.callocStack(stack);
+			renderPassInfo.sType(VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO)
+			              .pAttachments(attachments)
+			              .pSubpasses(subpasses)
+			              .pDependencies(dependency);
+			
+			return Vk.createRenderPass(getGpu(), renderPassInfo, stack.mallocLong(1));
+		}
+	}
+	
 	@Override
 	public void destroy(){
 		if(DevelopmentInfo.DEV_ON&&handle==null) throw new IllegalStateException("Swapchain already destroyed");
@@ -201,6 +291,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		memFree(acquireNextImageMem);
 		imageAviable.destroy();
 		frames.forEach(Frame::destroy);
+		depth.destroy();
 		vkDestroySwapchainKHR(gpu.getDevice(), handle.get(0), null);
 		
 		handle=null;

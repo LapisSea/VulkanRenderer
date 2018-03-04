@@ -5,6 +5,7 @@ import com.lapissea.vec.interf.IVec2iR;
 import com.lapissea.vulkanimpl.renderer.model.VkModelFormat;
 import com.lapissea.vulkanimpl.shaders.states.VkBlendMode;
 import com.lapissea.vulkanimpl.shaders.states.VkDrawMode;
+import com.lapissea.vulkanimpl.util.VkConstruct;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
@@ -164,11 +165,23 @@ public class ShaderState{
 		               .pVertexBindingDescriptions(input.format.getBindings(stack))
 		               .pVertexAttributeDescriptions(input.format.getAttributes(stack));
 		
+		VkPipelineDepthStencilStateCreateInfo depthStencil=VkConstruct.pipelineDepthStencilStateCreateInfo(stack);
+		depthStencil.depthTestEnable(true)
+		            .depthWriteEnable(true)
+		            .depthCompareOp(VK_COMPARE_OP_LESS)
+		            .depthBoundsTestEnable(false)
+		            .minDepthBounds(0)
+		            .maxDepthBounds(1)
+		            .stencilTestEnable(false)
+		            .front(VkStencilOpState.callocStack(stack))
+		            .back(VkStencilOpState.callocStack(stack));
+		
+		
 		pipelineInfo.pInputAssemblyState(inputAssembly)
 		            .pViewportState(viewport)
 		            .pRasterizationState(rasterizer)
 		            .pMultisampleState(multisampling)
-		            .pDepthStencilState(null)
+		            .pDepthStencilState(depthStencil)
 		            .pColorBlendState(colorBlendingState)
 		            .pVertexInputState(vertexInputInfo)
 		            .pDynamicState(dynamicStates);

@@ -11,6 +11,7 @@ package com.lapissea.vulkanimpl;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
+import com.lapissea.vulkanimpl.util.format.VkFormatInfo;
 import com.lapissea.vulkanimpl.util.types.*;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
@@ -294,14 +295,18 @@ public class Vk{
 		
 		VkImage[] images=new VkImage[count];
 		for(int i=0;i<lb.limit();i++){
-			images[i]=new VkImage(memAllocLong(1).put(0, lb.get(i)), gpu, VK_IMAGE_LAYOUT_UNDEFINED, VkExtent3D.calloc().set(swapchain.getSize().width(), swapchain.getSize().height(), 1)){
+			images[i]=new VkImage(memAllocLong(1).put(0, lb.get(i)),
+			                      gpu,
+			                      VK_IMAGE_LAYOUT_UNDEFINED,
+			                      VkExtent3D.calloc().set(swapchain.getSize().width(), swapchain.getSize().height(), 1),
+			                      VkFormatInfo.get(swapchain.getFormat())){
 				@Override
 				public void destroy(){
 					memFree(getBuff());
 				}
 				
 				@Override
-				public void transitionLayout(VkGpu.Queue queue, VkCommandPool pool, int newLayout){
+				public void transitionLayout(VkGpu.Queue queue, int newLayout){
 					throw new RuntimeException();
 				}
 			};
