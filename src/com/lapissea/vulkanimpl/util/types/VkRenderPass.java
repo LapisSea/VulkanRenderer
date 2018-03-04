@@ -32,13 +32,14 @@ public class VkRenderPass implements VkDestroyable, VkGpuCtx{
 			              .framebuffer(frameBuffer);
 			renderPassInfo.renderArea().offset().set(0, 0);
 			renderPassInfo.renderArea().extent(size);
-			VkClearValue.Buffer clearColorBuff=VkClearValue.callocStack(1, stack);
+			VkClearValue.Buffer clearColorBuff=VkClearValue.callocStack(2, stack);
 			clearColorBuff.get(0).color()
 			              .float32(0, clearColor.r())
 			              .float32(1, clearColor.g())
 			              .float32(2, clearColor.b())
 			              .float32(3, clearColor.a());
-			clearColorBuff.get(0).depthStencil().set(1, 0);
+			
+			clearColorBuff.get(1).depthStencil().set(1, 0);
 			renderPassInfo.pClearValues(clearColorBuff);
 			
 			vkCmdBeginRenderPass(cmd, renderPassInfo, cmd.isPrimary?VK_SUBPASS_CONTENTS_INLINE:VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);

@@ -175,7 +175,7 @@ public class VulkanCore implements VkDestroyable{
 		
 		stagingMemory.destroy();
 		stagingBuffer.destroy();
-		return new VkTexture(textureImage, textureImageMemory).createView(VK_FORMAT_R8G8B8A8_UNORM, VkImageAspect.COLOR).createSampler();
+		return new VkTexture(textureImage, textureImageMemory).createView(VkImageAspect.COLOR).createSampler();
 	}
 	
 	private void initUniform(){

@@ -191,4 +191,8 @@ public class VkImage implements VkDestroyable, VkGpuCtx{
 	public int getLayout(){
 		return currentLayout;
 	}
+	
+	public VkFormatInfo getFormat(){
+		return format;
+	}
 }

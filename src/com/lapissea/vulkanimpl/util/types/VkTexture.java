@@ -28,14 +28,14 @@ public class VkTexture implements VkDestroyable, VkGpuCtx{
 		this.memory=memory;
 	}
 	
-	public VkTexture createView(int format, VkImageAspect aspect){
+	public VkTexture createView(VkImageAspect aspect){
 		if(view!=VK_NULL_HANDLE) return this;
 		
 		LongBuffer lb=memAllocLong(1);
 		try(VkImageViewCreateInfo info=VkConstruct.imageViewCreateInfo()){
 			info.image(image.getHandle())
 			    .viewType(VK_IMAGE_VIEW_TYPE_2D)
-			    .format(format);
+			    .format(image.getFormat().handle);
 			
 			info.subresourceRange().set(aspect.val, 0, 1, 0, 1);
 			info.components().set(VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY);

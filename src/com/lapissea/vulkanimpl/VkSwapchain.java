@@ -126,8 +126,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		handle=memAllocLong(1);
 		Vk.createSwapchainKHR(gpu, createInfo, handle);
 		
-		VkTexture[] colors=UtilL.convert(Vk.getSwapchainImagesKHR(gpu, this, stack), VkTexture[]::new,
-		                                 image->new VkTexture(image, null).createView(format.format(), VkImageAspect.COLOR));
+		VkTexture[] colors =UtilL.convert(Vk.getSwapchainImagesKHR(gpu, this, stack), VkTexture[]::new, image->new VkTexture(image, null).createView(VkImageAspect.COLOR));
 		List<Frame> frames0=new ArrayList<>(colors.length);
 		for(int i=0;i<colors.length;i++){
 			frames0.add(new Frame(i, colors[i], gpu.createSemaphore()));
@@ -146,7 +145,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		img.transitionLayout(getGpu().getGraphicsQueue(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 		
 		depth=new VkTexture(img, mem);
-		
+		depth.createView(VkImageAspect.DEPTH);
 		
 		initFrames(renderPass);
 	}
@@ -163,7 +162,6 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 			
 			
 			for(Frame frame : frames){
-				
 				framebufferInfo.pAttachments(stack.longs(frame.colorFrame.getView(), depth.getView()));
 				
 				frame.frameBuffer=Vk.createFrameBuffer(gpu, framebufferInfo, stack.mallocLong(1));
