@@ -8,13 +8,12 @@ VK vkEnumeratePhysicalDevices basic optional=3,null
 
 package com.lapissea.vulkanimpl;
 
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.vulkanimpl.exceptions.VkException;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
-import com.lapissea.vulkanimpl.util.format.VkFormatInfo;
+import com.lapissea.vulkanimpl.util.format.VkDescriptor;
+import com.lapissea.vulkanimpl.util.format.VkFormat;
 import com.lapissea.vulkanimpl.util.types.*;
-import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
@@ -26,51 +25,19 @@ import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.Collection;
-import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
 import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
 import static com.lapissea.vulkanimpl.util.types.VkFence.Status.*;
+import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
-import static org.lwjgl.vulkan.EXTDebugReport.*;
-import static org.lwjgl.vulkan.KHRDisplaySwapchain.*;
 import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class Vk{
 	
-	private static final TIntObjectMap<String> CODES=new TIntObjectHashMap<>();
-	
-	static{
-//		if(DEV_ON) Generator_Vk.run();
-		
-		CODES.put(VK_SUCCESS, "Command successfully completed.");
-		CODES.put(VK_NOT_READY, "A fence or query has not yet completed.");
-		CODES.put(VK_TIMEOUT, "A wait operation has not completed in the specified time.");
-		CODES.put(VK_EVENT_SET, "An event is signaled.");
-		CODES.put(VK_EVENT_RESET, "An event is unsignaled.");
-		CODES.put(VK_INCOMPLETE, "A return array was too small for the result.");
-		CODES.put(VK_SUBOPTIMAL_KHR, "A swapchain no longer matches the surface properties exactly, but can still be used to present to the surface successfully.");
-		
-		CODES.put(VK_ERROR_OUT_OF_HOST_MEMORY, "A host memory allocation has failed.");
-		CODES.put(VK_ERROR_OUT_OF_DEVICE_MEMORY, "A device memory allocation has failed.");
-		CODES.put(VK_ERROR_INITIALIZATION_FAILED, "Initialization of an bool could not be completed for implementation-specific reasons.");
-		CODES.put(VK_ERROR_DEVICE_LOST, "The logical or physical device has been lost.");
-		CODES.put(VK_ERROR_MEMORY_MAP_FAILED, "Mapping of a memory bool has failed.");
-		CODES.put(VK_ERROR_LAYER_NOT_PRESENT, "A requested layer is not present or could not be loaded.");
-		CODES.put(VK_ERROR_EXTENSION_NOT_PRESENT, "A requested extension is not supported.");
-		CODES.put(VK_ERROR_FEATURE_NOT_PRESENT, "A requested feature is not supported.");
-		CODES.put(VK_ERROR_INCOMPATIBLE_DRIVER, "The requested version of Vulkan is not supported by the driver or is otherwise incompatible for implementation-specific reasons.");
-		CODES.put(VK_ERROR_TOO_MANY_OBJECTS, "Too many objects of the type have already been created.");
-		CODES.put(VK_ERROR_FORMAT_NOT_SUPPORTED, "A requested format is not supported on this device.");
-		CODES.put(VK_ERROR_SURFACE_LOST_KHR, "A surface is no longer available.");
-		CODES.put(VK_ERROR_NATIVE_WINDOW_IN_USE_KHR, "The requested window is already connected to a VkSurfaceKHR, or to some other non-Vulkan API.");
-		CODES.put(VK_ERROR_OUT_OF_DATE_KHR, "A surface has changed in such a way that it is no longer compatible with the swapchain, and further presentation requests using the swapchain will fail. Applications must query the new surface properties and recreate their swapchain if they wish to continue"+"presenting to the surface.");
-		CODES.put(VK_ERROR_INCOMPATIBLE_DISPLAY_KHR, "The display used by a swapchain does not use the same presentable image layout, or is incompatible in a way that prevents sharing an"+" image.");
-		CODES.put(VK_ERROR_VALIDATION_FAILED_EXT, "A validation layer found an error.");
-	}
 	
 	public static VkApplicationInfo initAppInfo(MemoryStack stack, String applicationName, String applicationVersion, String engineName, String engineVersion){
 		
@@ -102,11 +69,6 @@ public class Vk{
 		}
 	}
 	
-	public static String translateCode(int code){
-		String message=CODES.get(code);
-		return message==null?"Unknown ["+code+"]":message;
-	}
-	
 	public static void check(int code){
 		if(!DEV_ON) throw UtilL.uncheckedThrow(new IllegalAccessException("\n\n"+
 		                                                                  "\"check(int)\" can be used only for development debugging. \n"+
@@ -114,10 +76,7 @@ public class Vk{
 		                                                                  "Use \"if(DEV_ON){...}\" to debug. (When DEV_ON is false, it and its code will be removed by compiler optimization)\n"));
 		
 		if(code==VK_SUCCESS) return;
-		
-		List<String> msg=TextUtil.wrapLongString(translateCode(code), 100);
-		
-		throw new IllegalStateException(msg.size()==1?msg.get(0):"\n"+TextUtil.wrappedString(UtilL.array(msg)));
+		throw VkException.throwByCode(code);
 	}
 	
 	public static int enumeratePhysicalDevices(VkInstance instance, IntBuffer dest){
@@ -231,6 +190,8 @@ public class Vk{
 	
 	
 	public static PointerBuffer stringsToPP(Iterable<? extends CharSequence> strings, MemoryStack stack){
+		if(strings==null) return null;
+		
 		int size;
 		if(strings instanceof Collection) size=((Collection)strings).size();
 		else{
@@ -298,15 +259,15 @@ public class Vk{
 			images[i]=new VkImage(memAllocLong(1).put(0, lb.get(i)),
 			                      gpu,
 			                      VK_IMAGE_LAYOUT_UNDEFINED,
-			                      VkExtent3D.calloc().set(swapchain.getSize().width(), swapchain.getSize().height(), 1),
-			                      VkFormatInfo.get(swapchain.getFormat())){
+			                      VkExtent3D.calloc().set(swapchain.getExtent().width(), swapchain.getExtent().height(), 1),
+			                      VkFormat.get(swapchain.getColorFormat())){
 				@Override
 				public void destroy(){
 					memFree(getBuff());
 				}
 				
 				@Override
-				public void transitionLayout(VkGpu.Queue queue, int newLayout){
+				public void transitionLayout(VkGpu.Queue queue, int newLayout, int srcStageMask, int dstStageMask, int srcAccessMask, int dstAccessMask, int aspectMask){
 					throw new RuntimeException();
 				}
 			};
@@ -330,7 +291,8 @@ public class Vk{
 	public static VkRenderPass createRenderPass(VkGpuCtx gpu, VkRenderPassCreateInfo info, LongBuffer dest){
 		int code=vkCreateRenderPass(gpu.getDevice(), info, null, dest);
 		if(DEV_ON) check(code);
-		return new VkRenderPass(gpu.getGpu(), dest.get(0));
+		
+		return new VkRenderPass(gpu.getGpu(), dest.get(0), info.pAttachments().get(0).samples());
 	}
 	
 	public static long createGraphicsPipelines(VkGpuCtx gpu, long cache, VkGraphicsPipelineCreateInfo.Buffer pipelineInfo, LongBuffer dest){
@@ -478,7 +440,18 @@ public class Vk{
 		
 		int code=vkCreateDescriptorSetLayout(ctx.getDevice(), info, null, dest);
 		if(DEV_ON) check(code);
-		return new VkDescriptorSetLayout(dest, ctx.getGpu());
+		
+		VkDescriptorSetLayoutBinding.Buffer bindings=info.pBindings();
+		Objects.requireNonNull(bindings);
+		
+		VkDescriptor[] poolParts=new VkDescriptor[bindings.capacity()];
+		
+		for(int i=0;i<poolParts.length;i++){
+			VkDescriptorSetLayoutBinding kek=bindings.get(i);
+			poolParts[i]=new VkDescriptor(kek.descriptorType(), kek.stageFlags());
+		}
+		
+		return new VkDescriptorSetLayout(dest, ctx.getGpu(), poolParts);
 	}
 	
 	public static VkDescriptorPool createDescriptorPool(VkGpuCtx ctx, VkDescriptorPoolCreateInfo info, LongBuffer dest){
@@ -487,10 +460,19 @@ public class Vk{
 		return new VkDescriptorPool(ctx.getGpu(), dest.get(0));
 	}
 	
-	public static long allocateDescriptorSets(VkGpuCtx ctx, VkDescriptorSetAllocateInfo info, LongBuffer dest){
-		int code=vkAllocateDescriptorSets(ctx.getDevice(), info, dest);
-		if(DEV_ON) check(code);
-		return dest.get(0);
+	public static VkDescriptorSet[] allocateDescriptorSets(VkGpuCtx ctx, VkDescriptorSetAllocateInfo info){
+		try(MemoryStack stack=stackPush()){
+			LongBuffer dest=stack.mallocLong(info.descriptorSetCount());
+//			LongBuffer dest=memAllocLong(info.descriptorSetCount());
+			
+			int code=vkAllocateDescriptorSets(ctx.getDevice(), info, dest);
+			if(DEV_ON) check(code);
+			VkDescriptorSet[] dst=new VkDescriptorSet[dest.limit()];
+			for(int i=0;i<dest.limit();i++){
+				dst[i]=new VkDescriptorSet(ctx.getGpu(), memAllocLong(1).put(0, dest.get(i)));
+			}
+			return dst;
+		}
 	}
 	
 	public static long createSampler(VkDevice device, VkSamplerCreateInfo info, LongBuffer dest){
@@ -498,6 +480,13 @@ public class Vk{
 		if(DEV_ON) check(code);
 		return dest.get(0);
 	}
+	
+	public static void resetCommandBuffer(VkCommandBuffer commandBuffer, int flags){
+		int code=vkResetCommandBuffer(commandBuffer, flags);
+		if(DEV_ON) check(code);
+	}
+	
+	
 	
 	/*/START_GEN/*/
 	//lel

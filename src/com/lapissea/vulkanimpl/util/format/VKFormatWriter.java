@@ -4,6 +4,8 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.lapissea.vulkanimpl.util.format.VkFormat.StorageType.*;
+
 public abstract class VKFormatWriter{
 	
 	public abstract static class F extends VKFormatWriter{
@@ -35,10 +37,10 @@ public abstract class VKFormatWriter{
 			ISiz(int size){this.size=size;}
 			
 			@Override
-			public boolean canWriteAs(VkFormatInfo info){
+			public boolean canWriteAs(VkFormat info){
 				if(info.totalByteSize!=size) return false;
-				if(info.packSizes.size()==1&&info.components.get(0).storageType==VkFormatInfo.StorageType.INT) return true;
-				return info.components.size()==1&&info.components.get(0).storageType==VkFormatInfo.StorageType.INT;
+				if(info.packSizes.size()==1&&info.components.get(0).storageType==INT) return true;
+				return info.components.size()==1&&info.components.get(0).storageType==INT;
 			}
 		}
 		
@@ -51,25 +53,16 @@ public abstract class VKFormatWriter{
 		WRITERS.add(new ISiz(2){
 			@Override
 			public void write(int i){
-				dest.put((byte)(i&0xFF));
-				dest.put((byte)((i>>8)&0xFF));
-			}
-		});
-		WRITERS.add(new ISiz(3){
-			@Override
-			public void write(int i){
-				dest.put((byte)(i&0xFF));
-				dest.put((byte)((i>>8)&0xFF));
-				dest.put((byte)((i>>16)&0xFF));
+				dest.putShort((short)(i&0xFFFF));
 			}
 		});
 		
 		WRITERS.add(new F(){
 			@Override
-			public boolean canWriteAs(VkFormatInfo info){
+			public boolean canWriteAs(VkFormat info){
 				if(info.totalByteSize!=4) return false;
-				if(info.packSizes.size()==1&&info.components.get(0).storageType==VkFormatInfo.StorageType.FLOAT) return true;
-				return info.components.size()==1&&info.components.get(0).storageType==VkFormatInfo.StorageType.FLOAT;
+				if(info.packSizes.size()==1&&info.components.get(0).storageType==FLOAT) return true;
+				return info.components.size()==1&&info.components.get(0).storageType==FLOAT;
 			}
 			
 			@Override
@@ -80,10 +73,10 @@ public abstract class VKFormatWriter{
 		
 		WRITERS.add(new FF(){
 			@Override
-			public boolean canWriteAs(VkFormatInfo info){
+			public boolean canWriteAs(VkFormat info){
 				if(info.totalByteSize!=8) return false;
-				if(info.packSizes.size()==1&&info.components.get(0).storageType==VkFormatInfo.StorageType.FLOAT) return true;
-				return info.components.size()==2&&info.components.get(0).storageType==VkFormatInfo.StorageType.FLOAT;
+				if(info.packSizes.size()==1&&info.components.get(0).storageType==FLOAT) return true;
+				return info.components.size()==2&&info.components.get(0).storageType==FLOAT;
 			}
 			
 			@Override
@@ -94,10 +87,10 @@ public abstract class VKFormatWriter{
 		
 		WRITERS.add(new FFF(){
 			@Override
-			public boolean canWriteAs(VkFormatInfo info){
+			public boolean canWriteAs(VkFormat info){
 				if(info.totalByteSize!=12) return false;
-				if(info.packSizes.size()==1&&info.components.get(0).storageType==VkFormatInfo.StorageType.FLOAT) return true;
-				return info.components.size()==3&&info.components.get(0).storageType==VkFormatInfo.StorageType.FLOAT;
+				if(info.packSizes.size()==1&&info.components.get(0).storageType==FLOAT) return true;
+				return info.components.size()==3&&info.components.get(0).storageType==FLOAT;
 			}
 			
 			@Override
@@ -108,10 +101,10 @@ public abstract class VKFormatWriter{
 		
 		WRITERS.add(new FFFF(){
 			@Override
-			public boolean canWriteAs(VkFormatInfo info){
+			public boolean canWriteAs(VkFormat info){
 				if(info.totalByteSize!=16) return false;
-				if(info.packSizes.size()==1&&info.components.get(0).storageType==VkFormatInfo.StorageType.FLOAT) return true;
-				return info.components.size()==4&&info.components.get(0).storageType==VkFormatInfo.StorageType.FLOAT;
+				if(info.packSizes.size()==1&&info.components.get(0).storageType==FLOAT) return true;
+				return info.components.size()==4&&info.components.get(0).storageType==FLOAT;
 			}
 			
 			@Override
@@ -123,8 +116,13 @@ public abstract class VKFormatWriter{
 	
 	////////////////////////////
 	
-	public static VKFormatWriter get(VkFormatInfo info){
-		return WRITERS.stream().filter(w->w.canWriteAs(info)).findFirst().orElse(null);
+	public static VKFormatWriter get(VkFormat info){
+		for(VKFormatWriter w : WRITERS){
+			if(w.canWriteAs(info)){
+				return w;
+			}
+		}
+		return null;
 	}
 	
 	////////////////////////////
@@ -135,6 +133,6 @@ public abstract class VKFormatWriter{
 		dest=buff;
 	}
 	
-	public abstract boolean canWriteAs(VkFormatInfo info);
+	public abstract boolean canWriteAs(VkFormat info);
 	
 }

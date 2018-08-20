@@ -1,9 +1,14 @@
 package com.lapissea.vulkanimpl;
 
+import com.lapissea.util.ArrayViewList;
+import com.lapissea.vulkanimpl.renderer.model.VkMesh;
+import com.lapissea.vulkanimpl.renderer.model.VkMesh.IndexType;
+import com.lapissea.vulkanimpl.renderer.model.VkMeshFormat;
 import com.lapissea.vulkanimpl.util.VkConstruct;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
-import com.lapissea.vulkanimpl.util.format.VkFormatInfo;
+import com.lapissea.vulkanimpl.util.format.VkDescriptor;
+import com.lapissea.vulkanimpl.util.format.VkFormat;
 import com.lapissea.vulkanimpl.util.types.*;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -12,6 +17,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
+import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.Arrays;
@@ -19,8 +25,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
@@ -99,13 +105,13 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 	
 	public class FormatProps{
 		
-		public final VkFormatInfo format;
+		public final VkFormat format;
 		
 		public final int linearTiling;
 		public final int optimalTiling;
 		public final int buffer;
 		
-		public FormatProps(VkFormatInfo format, int linearTiling, int optimalTiling, int buffer){
+		public FormatProps(VkFormat format, int linearTiling, int optimalTiling, int buffer){
 			this.format=format;
 			this.linearTiling=linearTiling;
 			this.optimalTiling=optimalTiling;
@@ -153,11 +159,12 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		
 		
 		try(MemoryStack stack=stackPush()){
-			deviceExtensionProperties=Vk.getDeviceExtensionProperties(stack, getPhysicalDevice(), stack.mallocInt(1))
-			                            .stream()
-			                            .map(VkExtensionProperties::extensionNameString)
-			                            .collect(Collectors.toList());
+			String[] data=Vk.getDeviceExtensionProperties(stack, getPhysicalDevice(), stack.mallocInt(1))
+			                .stream()
+			                .map(VkExtensionProperties::extensionNameString)
+			                .toArray(String[]::new);
 			
+			deviceExtensionProperties=ArrayViewList.create(data, null);
 		}
 		
 		findQueueFamilies();
@@ -188,8 +195,8 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		}
 	}
 	
-	public void init(PointerBuffer layers, PointerBuffer extensions){
-		if(logicalDevice!=null) return;
+	public VkGpu init(PointerBuffer layers, PointerBuffer extensions){
+		if(logicalDevice!=null) return this;
 		
 		try(MemoryStack stack=stackPush()){
 			
@@ -234,7 +241,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		
 		CompletableFuture<FormatProps[]> fut=CompletableFuture.supplyAsync(()->{
 			try(VkFormatProperties props=VkFormatProperties.calloc()){
-				return VkFormatInfo.stream().map(format->{
+				return VkFormat.stream().map(format->{
 					vkGetPhysicalDeviceFormatProperties(physicalDevice, format.handle, props);
 					
 					if(props.linearTilingFeatures()==0&&props.optimalTilingFeatures()==0&&props.bufferFeatures()==0) return null;
@@ -248,6 +255,8 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			supportedFormats=()->i;
 			return i;
 		};
+		
+		return this;
 	}
 	
 	@Override
@@ -288,7 +297,7 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 					return i;
 				}
 			}
-			bits>>=1;
+			bits >>= 1;
 		}
 		return -1;
 	}
@@ -396,29 +405,36 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		}
 	}
 	
-	public VkDescriptorSetLayout createDescriptorSetLayout(int stage, int type, int... repeat){
+	
+	public VkDescriptorSetLayout createDescriptorSetLayout(VkDescriptor... descriptors){
+		
 		try(MemoryStack stack=stackPush()){
-			int                                 repeatCount     =repeat.length/2;
-			VkDescriptorSetLayoutBinding.Buffer uboLayoutBinding=VkDescriptorSetLayoutBinding.calloc(1+repeatCount);
+			VkDescriptorSetLayoutBinding.Buffer uboLayoutBinding=VkDescriptorSetLayoutBinding.calloc(descriptors.length);
 			VkDescriptorSetLayoutCreateInfo     layoutInfo      =VkConstruct.descriptorSetLayoutCreateInfo(stack);
-			uboLayoutBinding.get(0)
-			                .binding(0)
-			                .descriptorType(type)
-			                .descriptorCount(1)
-			                .stageFlags(stage);
-			for(int i=0;i<repeatCount;i++){
-				uboLayoutBinding.get(i+1)
-				                .binding(i+1)
-				                .descriptorType(repeat[i*2+1])
+			
+			for(int i=0;i<descriptors.length;i++){
+				VkDescriptor d=Objects.requireNonNull(descriptors[i]);
+				
+				uboLayoutBinding.get(i)
+				                .binding(i)
+				                .descriptorType(d.type)
 				                .descriptorCount(1)
-				                .stageFlags(repeat[i*2]);
+				                .stageFlags(d.stageFlags);
 			}
 			layoutInfo.pBindings(uboLayoutBinding);
 			return Vk.createDescriptorSetLayout(this, layoutInfo);
 		}
 	}
 	
-	public VkImage create2DImage(int width, int height, int format, int tiling, int usage){
+	public VkImage create2DImage(VkExtent2D extent, int format, int tiling, int usage, int samples){
+		return create2DImage(extent.width(), extent.height(), format, tiling, usage, samples);
+	}
+
+//	public VkImage create2DImage(int width, int height, int format, int tiling, int usage){
+//		return create2DImage(width, height, format, tiling, usage, VK_SAMPLE_COUNT_1_BIT);
+//	}
+	
+	public VkImage create2DImage(int width, int height, int format, int tiling, int usage, int samples){
 		try(VkImageCreateInfo imageInfo=VkConstruct.imageCreateInfo()){
 			imageInfo.extent().set(width, height, 1);
 			imageInfo.imageType(VK_IMAGE_TYPE_2D)
@@ -429,11 +445,11 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 			         .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
 			         .usage(usage)
 			         .sharingMode(VK_SHARING_MODE_EXCLUSIVE)
-			         .samples(VK_SAMPLE_COUNT_1_BIT);
+			         .samples(samples);
 			/*
-			* VK_IMAGE_LAYOUT_UNDEFINED: Not usable by the GPU and the very first transition will discard the texels.
-			* VK_IMAGE_LAYOUT_PREINITIALIZED: Not usable by the GPU, but the first transition will preserve the texels.
-			* */
+			 * VK_IMAGE_LAYOUT_UNDEFINED: Not usable by the GPU and the very first transition will discard the texels.
+			 * VK_IMAGE_LAYOUT_PREINITIALIZED: Not usable by the GPU, but the first transition will preserve the texels.
+			 * */
 			
 			return VkImage.create(this, imageInfo);
 		}
@@ -451,5 +467,71 @@ public class VkGpu implements VkDestroyable, VkGpuCtx{
 		
 		FormatProps fp=formats[pos];
 		return fp.format.handle==format?fp:null;
+	}
+	
+	public VkDescriptorPool createDescriptorPool(int maxSets, VkDescriptor... descriptors){
+		try(MemoryStack stack=stackPush()){
+			VkDescriptorPoolSize.Buffer poolSize=VkDescriptorPoolSize.callocStack(descriptors.length, stack);
+			for(int i=0;i<descriptors.length;i++){
+				poolSize.position(i)
+				        .type(descriptors[i].type)
+				        .descriptorCount(1);
+			}
+			return createDescriptorPool(maxSets, poolSize);
+		}
+	}
+	
+	public VkDescriptorPool createDescriptorPool(int maxSets, VkDescriptorPoolSize.Buffer poolSizes){
+		LongBuffer lb=memAllocLong(1);
+		try(VkDescriptorPoolCreateInfo poolInfo=VkConstruct.descriptorPoolCreateInfo()){
+			poolInfo.pPoolSizes(poolSizes)
+			        .maxSets(maxSets);
+			return Vk.createDescriptorPool(this, poolInfo, lb);
+		}finally{
+			memFree(lb);
+		}
+	}
+	
+	public VkMesh upload(Consumer<ByteBuffer> writer, VkMeshFormat format, int totalSize, int indexCount){
+		if(totalSize==0) return VkMesh.EMPTY_MESH;
+		
+		IndexType indexType  =IndexType.get(indexCount);
+		boolean   indexed    =indexCount>0;
+		int       indexStart =totalSize-indexType.bytes*indexCount;
+		int       vertexCount=totalSize/format.getSize();
+
+//		if(indexed){
+//			if(indexStart%format.getSize()!=0) throw new RuntimeException("Invalid size! "+indexStart+"/"+format.getSize());
+//		}else{
+//			if(totalSize%format.getSize()!=0) throw new RuntimeException("Invalid size! "+totalSize+"/"+format.getSize());
+//		}
+		
+		
+		VkBuffer       stagingBuffer=createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, totalSize);
+		VkDeviceMemory stagingMemory=stagingBuffer.createMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		
+		try(VkDeviceMemory.MemorySession ses=stagingMemory.memorySession(stagingBuffer.getSize())){
+			
+			writer.accept(ses.memory);
+
+//			LogUtil.println(ses.memory);
+			
+			stagingMemory.flushRanges();
+			stagingMemory.invalidateRanges();
+		}
+		
+		int usage=VK_BUFFER_USAGE_TRANSFER_DST_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		if(indexed) usage|=VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+		
+		VkBuffer       modelBuffer=createBuffer(usage, totalSize);
+		VkDeviceMemory modelMemory=modelBuffer.createMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		
+		modelBuffer.copyFrom(stagingBuffer, 0, getTransferQueue().getPool());
+		
+		stagingBuffer.destroy();
+		stagingMemory.destroy();
+		
+		if(indexed) return new VkMesh.Indexed(modelBuffer, modelMemory, format, indexStart, indexCount, indexType);
+		return new VkMesh.Raw(modelBuffer, modelMemory, format, vertexCount);
 	}
 }

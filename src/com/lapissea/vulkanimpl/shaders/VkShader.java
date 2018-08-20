@@ -1,54 +1,61 @@
 package com.lapissea.vulkanimpl.shaders;
 
-import com.lapissea.datamanager.IDataManager;
-import com.lapissea.util.UtilL;
-import com.lapissea.util.filechange.FileChageDetector;
+import com.lapissea.util.NotNull;
+import com.lapissea.util.Nullable;
 import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VkGpu;
-import com.lapissea.vulkanimpl.util.DevelopmentInfo;
+import com.lapissea.vulkanimpl.assets.ResourceManagerSourced;
+import com.lapissea.vulkanimpl.util.VkConstruct;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
-import com.lapissea.vulkanimpl.util.VkShaderCompiler;
-import com.lapissea.vulkanimpl.util.types.VkCommandBufferM;
-import com.lapissea.vulkanimpl.util.types.VkRenderPass;
-import com.lapissea.vulkanimpl.util.types.VkShaderModule;
-import com.lapissea.vulkanimpl.util.types.VkSurface;
-import org.lwjgl.system.MemoryStack;
+import com.lapissea.vulkanimpl.util.types.*;
 import org.lwjgl.vulkan.VkGraphicsPipelineCreateInfo;
-import org.lwjgl.vulkan.VkPipelineLayoutCreateInfo;
 import org.lwjgl.vulkan.VkPipelineShaderStageCreateInfo;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
-import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.concurrent.CompletableFuture;
 
+import static com.lapissea.util.UtilL.*;
+import static com.lapissea.vulkanimpl.shaders.VkShader.Type.*;
+import static graphics.scenery.spirvcrossj.EShLanguage.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class VkShader implements VkDestroyable, VkGpuCtx{
 	
-	
 	public enum Type{
-		FRAGMENT("frag", VK_SHADER_STAGE_FRAGMENT_BIT),
-		GEOMETRY("geom", VK_SHADER_STAGE_GEOMETRY_BIT),
-		VERTEX("vert", VK_SHADER_STAGE_VERTEX_BIT),
-		COMPUTE("comp", VK_SHADER_STAGE_COMPUTE_BIT);
+		VERTEX("vert", VK_SHADER_STAGE_VERTEX_BIT, EShLangVertex),
+		FRAGMENT("frag", VK_SHADER_STAGE_FRAGMENT_BIT, EShLangFragment),
+		GEOMETRY("geom", VK_SHADER_STAGE_GEOMETRY_BIT, EShLangGeometry),
+		TESS_CONTROL("tesc", VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, EShLangTessControl),
+		TESS_EVALUATION("tese", VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, EShLangTessEvaluation),
+		COMPUTE("comp", VK_SHADER_STAGE_COMPUTE_BIT, EShLangCompute);
+		
 		public final String extension;
 		public final int    stageBit;
+		public final int    libspirvcrossj;
 		
-		Type(String extension, int stageBit){
+		Type(String extension, int stageBit, int libspirvcrossj){
 			this.extension=extension;
 			this.stageBit=stageBit;
+			this.libspirvcrossj=libspirvcrossj;
+		}
+		
+		public static Type fromName(String path){
+			for(Type value : values()){
+				if(path.endsWith("."+value.extension)) return value;
+				if(path.endsWith("."+value.extension+".spv")) return value;
+			}
+			return null;
+		}
+		
+		public String append(String path){
+			return path+"."+extension;
 		}
 	}
 	
@@ -64,63 +71,87 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 	
 	public static final String SHADER_ROOT="assets/shaders/";
 	
-	public final  String               name;
-	private final IDataManager         shadersFolder;
-	private final VkGpu                gpu;
-	private final VkSurface            surface;
-	private       long                 pipeline;
-	private       List<VkShaderModule> stages;
+	public final  String           name;
+	private final VkGpu            gpu;
+	private final VkSurface        surface;
+	private       boolean          destroyed;
+	private       long             pipeline;
+	private final VkShaderModule[] stages=new VkShaderModule[Type.values().length];
 	
-	private long pipelineLayout;
+	private long         pipelineLayout;
+	private VkRenderPass renderPass;
+	private ShaderState  state;
+	
+	private final ResourceManagerSourced<ByteBuffer, VkShaderCode> shadersFolder;
 	
 	/**
 	 * @param shadersFolder Has to point to a shaders folder (SHADER_ROOT)
-	 * @param name
-	 * @param gpu
-	 * @param surface
 	 */
-	public VkShader(IDataManager shadersFolder, String name, VkGpu gpu, VkSurface surface){
+	public VkShader(ResourceManagerSourced<ByteBuffer, VkShaderCode> shadersFolder, String name, VkGpu gpu, VkSurface surface){
 		this.name=name;
-		this.shadersFolder=shadersFolder;
 		this.gpu=gpu;
 		this.surface=surface;
+		this.shadersFolder=shadersFolder;
+
+//		stageCode=convert(Type.values(), VkShaderCode[]::new, t->shadersFolder.source.exists(t.append(name))?shadersFolder.get(t.append(name)):null);
 	}
 	
 	public VkShader init(ShaderState state, VkRenderPass renderPass, LongBuffer setLayouts){
-		if(DevelopmentInfo.DEV_ON){
-			
-			BiConsumer<String, String> winComp=(fileName, type)->{
-				File target=new File("res/assets/shaders", fileName);
-				if(!target.exists()) return;
-				
-				FileChageDetector.autoHandle(target, new File("dev/assets/shaders", fileName+".track"), ()->VkShaderCompiler.compile(fileName, type));
-			};
-			Arrays.stream(Type.values()).parallel().map(t->"."+t.extension).forEach(type->winComp.accept(name+type, type));
+		this.renderPass=renderPass;
+		this.state=state;
+		
+		try(var stack=stackPush()){
+			pipelineLayout=Vk.createPipelineLayout(gpu, VkConstruct.pipelineLayoutCreateInfo(stack, setLayouts, null), stack.mallocLong(1));
+		}
+		updateCode();
+		validateStages();
+		return this;
+	}
+	
+	private boolean shaderChange;
+	
+	private void acceptSpirv(Type type, ByteBuffer spirv){
+		try{
+			if(spirv==null) return;
+			shaderChange=true;
+			VkShaderModule i=stages[type.ordinal()];
+			if(i!=null) i.destroy();
+			stages[type.ordinal()]=VkShaderModule.create(this, spirv, type);
+		}finally{
+			memFree(spirv);
+		}
+	}
+	
+	public synchronized boolean updateCode(){
+		shaderChange=false;
+		getGpu().waitIdle();
+		var tasks=convert(Type.values(), CompletableFuture[]::new,
+		                  t->shadersFolder.get(t.append(name))
+		                                  .thenAccept(spriv->acceptSpirv(t, spriv))
+		                 );
+		
+		for(CompletableFuture task : tasks){
+			task.join();
 		}
 		
-		stages=Stream.of(loadStage(Type.VERTEX),
-		                 loadStage(Type.FRAGMENT),
-		                 loadStageOptional(Type.GEOMETRY))
-		             .filter(Objects::nonNull)
-		             .collect(Collectors.toList());
-		stages=Collections.unmodifiableList(stages);
+		if(!shaderChange){
+			return false;
+		}
 		
-		try(MemoryStack stack=stackPush()){
+		if(pipeline!=0) vkDestroyPipeline(gpu.getDevice(), pipeline, null);
+		
+		validateStages();
+		
+		try(var stack=stackPush()){
 			
-			VkPipelineLayoutCreateInfo pipelineLayoutInfo=VkPipelineLayoutCreateInfo.callocStack(stack);
-			pipelineLayoutInfo.sType(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
-			                  .pSetLayouts(setLayouts)
-			                  .pPushConstantRanges(null);
+			var shaderStages=VkPipelineShaderStageCreateInfo.callocStack((int)Arrays.stream(stages).filter(Objects::nonNull).count(), stack);
 			
-			pipelineLayout=Vk.createPipelineLayout(gpu, pipelineLayoutInfo, stack.mallocLong(1));
-			
-			
-			VkPipelineShaderStageCreateInfo.Buffer shaderStages=VkPipelineShaderStageCreateInfo.callocStack(stages.size(), stack);
-			for(int i=0;i<stages.size();i++){
-				stages.get(i).write(shaderStages.get(i));
+			int count=0;
+			for(var stage : stages){
+				if(stage!=null) stage.write(shaderStages.get(count++));
 			}
 			
-			VkGraphicsPipelineCreateInfo.Buffer pipelineInfo=VkGraphicsPipelineCreateInfo.callocStack(1, stack);
+			var pipelineInfo=VkGraphicsPipelineCreateInfo.callocStack(1, stack);
 			pipelineInfo.get(0)
 			            .sType(VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO)
 			            .pStages(shaderStages)
@@ -133,65 +164,47 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 			
 			pipeline=Vk.createGraphicsPipelines(gpu, 0, pipelineInfo, stack.mallocLong(1));
 		}
-		return this;
+		return true;
 	}
 	
-	
-	private VkShaderModule loadStageOptional(Type type){
-		try{
-			return loadStage(type);
-		}catch(Throwable t){
-			return null;
-		}
-	}
-	
-	private VkShaderModule loadStage(Type type){
-		//check if resource is valid/exists
-		String path=name+"."+type.extension+".spv";
-		int    size=(int)shadersFolder.getSize(path);
-		if(size<=0) throw new IllegalStateException("missing: "+path);
+	private void validateStages(){
 		
-		//NOTE: On heap allocation! Possibly a lot of memory to be allocated!
-		ByteBuffer spvCode=memAlloc(size);
-		
-		try(MemoryStack stack=stackPush()){
-			
-			//load shader bytes
-			try(BufferedInputStream in=shadersFolder.getInStream(path)){
-				int b;
-				while((b=in.read())!=-1){
-					spvCode.put((byte)b);
-				}
-			}catch(IOException e){
-				UtilL.uncheckedThrow(e);
-			}
-			
-			//loaded
-			spvCode.flip();
-			
-			//compile
-			return VkShaderModule.create(this, spvCode, type, stack);
-		}finally{
-			
-			// make sure to unload heap memory
-			memFree(spvCode);
+		if(getStage(VERTEX)==null){
+			throw new RuntimeException("Shader missing vertex stageFlags at \""+name+"\"!");
 		}
+		
 	}
 	
 	public void bind(VkCommandBufferM cmd){
 		vkCmdBindPipeline(cmd, isCompute()?VK_PIPELINE_BIND_POINT_COMPUTE:VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 	}
 	
-	public void bindDescriptorSets(VkCommandBufferM cmd, LongBuffer descriptorSet){
-		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, descriptorSet, null);
+	public void bindDescriptorSets(@NotNull VkCommandBufferM cmd, @NotNull VkDescriptorSet descriptorSet){
+		bindDescriptorSets(cmd, descriptorSet.getBuff());
 	}
 	
+	public void bindDescriptorSets(@NotNull VkCommandBufferM cmd, @NotNull LongBuffer descriptorSet){
+		bindDescriptorSets(cmd, descriptorSet, null);
+	}
+	
+	public void bindDescriptorSets(@NotNull VkCommandBufferM cmd, @NotNull LongBuffer descriptorSet, @Nullable IntBuffer dynamicOffsets){
+		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, descriptorSet, dynamicOffsets);
+	}
+	
+	private VkShaderModule getStage(@NotNull Type type){
+		return stages[type.ordinal()];
+	}
 	
 	@Override
 	public void destroy(){
+		destroyed=true;
 		vkDestroyPipeline(gpu.getDevice(), pipeline, null);
 		vkDestroyPipelineLayout(gpu.getDevice(), pipelineLayout, null);
-		stages.forEach(VkShaderModule::destroy);
+		Arrays.stream(stages).filter(Objects::nonNull).forEach(VkShaderModule::destroy);
+	}
+	
+	public boolean isDestroyed(){
+		return destroyed;
 	}
 	
 	@Override
@@ -199,11 +212,22 @@ public class VkShader implements VkDestroyable, VkGpuCtx{
 		return gpu;
 	}
 	
-	public List<VkShaderModule> getStages(){
-		return stages;
-	}
-	
 	public boolean isCompute(){
 		return false;
+	}
+	
+	@Override
+	public boolean equals(Object o){
+		if(this==o) return true;
+		return o instanceof VkShader&&equals((VkShader)o);
+	}
+	
+	public boolean equals(VkShader o){
+		return o!=null&&pipeline==o.pipeline;
+	}
+	
+	@Override
+	public int hashCode(){
+		return Long.hashCode(pipeline);
 	}
 }

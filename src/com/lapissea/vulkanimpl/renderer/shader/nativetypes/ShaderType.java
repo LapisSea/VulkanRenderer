@@ -1,6 +1,7 @@
 package com.lapissea.vulkanimpl.renderer.shader.nativetypes;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class ShaderType{
@@ -25,6 +26,6 @@ public class ShaderType{
 	public final List<Class<?>> primitives;
 	
 	public ShaderType(String nativeName, Class<?>... classes){
-		primitives=List.of(classes);
+		primitives=Arrays.asList(classes);
 	}
 }

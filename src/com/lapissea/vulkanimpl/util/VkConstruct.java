@@ -3,6 +3,8 @@ package com.lapissea.vulkanimpl.util;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
+import java.nio.LongBuffer;
+
 import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -60,6 +62,9 @@ public class VkConstruct{
 		return VkDescriptorSetLayoutCreateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
 	}
 	
+	public static VkDescriptorPoolCreateInfo descriptorPoolCreateInfo(){
+		return VkDescriptorPoolCreateInfo.calloc().sType(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO);
+	}
 	public static VkDescriptorPoolCreateInfo descriptorPoolCreateInfo(MemoryStack stack){
 		return VkDescriptorPoolCreateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO);
 	}
@@ -102,5 +107,14 @@ public class VkConstruct{
 	
 	public static VkPipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo(MemoryStack stack){
 		return VkPipelineDepthStencilStateCreateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO);
+	}
+	
+	public static VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo(MemoryStack stack, LongBuffer setLayouts, VkPushConstantRange.Buffer pushConstantRanges){
+		return VkPipelineLayoutCreateInfo.mallocStack(stack)
+		                                 .sType(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
+		                                 .pNext(0)
+		                                 .flags(0)
+		                                 .pSetLayouts(setLayouts)
+		                                 .pPushConstantRanges(pushConstantRanges);
 	}
 }

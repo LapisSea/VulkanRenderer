@@ -1,8 +1,10 @@
 package com.lapissea.vulkanimpl;
 
+import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vec.interf.IVec2iR;
+import com.lapissea.vulkanimpl.exceptions.VkException;
 import com.lapissea.vulkanimpl.util.DevelopmentInfo;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
@@ -13,8 +15,6 @@ import org.lwjgl.vulkan.*;
 
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import static org.lwjgl.system.MemoryStack.*;
@@ -25,6 +25,7 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	
+	public static final String ZERO_EXTENT_MESSAGE="Extent is 0/0";
 	
 	public class Frame{
 		private      long        frameBuffer;
@@ -55,19 +56,30 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	
 	private       LongBuffer  handle;
 	private final VkGpu       gpu;
-	private       int         format;
+	private       int         colorFormat;
 	private       int         colorSpace;
 	private       VkSemaphore imageAviable;
 	private       List<Frame> frames;
 	private       VkTexture   depth;
-	private final VkExtent2D extent=VkExtent2D.calloc();
+	private       VkTexture   color;
+	
+	private final VkExtent2D extent    =VkExtent2D.calloc();
+	private final IVec2iR    extentView=new IVec2iR(){
+		@Override
+		public int x(){ return extent.width(); }
+		
+		@Override
+		public int y(){ return extent.height(); }
+	};
 	
 	private IntBuffer acquireNextImageMem=memAllocInt(1);
 	
-	private VkCommandBufferM[] frameBinds;
+	private       VkCommandBufferM[] frameBinds;
+	private final int                samples;
 	
-	public VkSwapchain(VkGpu gpu, VkSurface surface, IVec2iR size){
+	public VkSwapchain(VkGpu gpu, VkSurface surface, IVec2iR size, int samples){
 		this.gpu=gpu;
+		this.samples=samples;
 		try(MemoryStack stack=stackPush()){
 			create(gpu, surface, size, stack);
 		}
@@ -75,7 +87,6 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	}
 	
 	private void create(VkGpu gpu, VkSurface surface, IVec2iR size, MemoryStack stack){
-		
 		//acquire currency
 		IntBuffer count=stack.mallocInt(1);
 		Vk.getPhysicalDeviceSurfacePresentModesKHR(gpu.getPhysicalDevice(), surface, count, null);
@@ -91,19 +102,25 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		VkSurfaceFormatKHR format     =chooseSwapSurfaceFormat(Vk.getPhysicalDeviceSurfaceFormatsKHR(gpu, stack));
 		chooseSwapExtent(size, stack, surface.getCapabilities(gpu, stack));
 		
+		if(extentView.isZero()){
+			extent.free();
+			memFree(acquireNextImageMem);
+			throw new VkException(ZERO_EXTENT_MESSAGE);
+		}
+		
 		int imageCount=caps.minImageCount()+1;
 		if(caps.maxImageCount()>0) imageCount=Math.min(imageCount, caps.maxImageCount());
 		
 		
-		this.format=format.format();
+		this.colorFormat=format.format();
 		colorSpace=format.colorSpace();
 		
 		VkSwapchainCreateInfoKHR createInfo=VkSwapchainCreateInfoKHR.callocStack(stack);
 		createInfo.sType(VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR)
 		          .surface(surface.handle)
 		          .minImageCount(imageCount)
-		          .imageFormat(format.format())
-		          .imageColorSpace(format.colorSpace())
+		          .imageFormat(colorFormat)
+		          .imageColorSpace(colorSpace)
 		          .imageExtent(extent)
 		          .imageArrayLayers(1)
 		          .imageUsage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
@@ -127,11 +144,11 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		Vk.createSwapchainKHR(gpu, createInfo, handle);
 		
 		VkTexture[] colors =UtilL.convert(Vk.getSwapchainImagesKHR(gpu, this, stack), VkTexture[]::new, image->new VkTexture(image, null).createView(VkImageAspect.COLOR));
-		List<Frame> frames0=new ArrayList<>(colors.length);
+		Frame[]     frames0=new Frame[colors.length];
 		for(int i=0;i<colors.length;i++){
-			frames0.add(new Frame(i, colors[i], gpu.createSemaphore()));
+			frames0[i]=new Frame(i, colors[i], gpu.createSemaphore());
 		}
-		frames=Collections.unmodifiableList(frames0);
+		frames=ArrayViewList.create(frames0, null);
 	}
 	
 	
@@ -139,13 +156,21 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		
 		int tiling=VK_IMAGE_TILING_OPTIMAL;
 		
-		VkImage        img=getGpu().create2DImage(extent.width(), extent.height(), findDepthFormat(tiling), tiling, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+		VkImage        img=getGpu().create2DImage(extent, findDepthFormat(tiling), tiling, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, samples);
 		VkDeviceMemory mem=img.createMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		
-		img.transitionLayout(getGpu().getGraphicsQueue(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+		img.transitionLayout(getGpu().getGraphicsQueue(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VkImage.TOP_TO_TRANSFER_WRITE);
 		
 		depth=new VkTexture(img, mem);
 		depth.createView(VkImageAspect.DEPTH);
+		
+//		img=getGpu().create2DImage(extent, colorFormat, tiling, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, samples);
+//		mem=img.createMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+//
+//		img.transitionLayout(getGpu().getGraphicsQueue(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+//
+//		color=new VkTexture(img, mem);
+//		color.createView(VkImageAspect.COLOR);
 		
 		initFrames(renderPass);
 	}
@@ -153,17 +178,20 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 	private void initFrames(VkRenderPass renderPass){
 		
 		try(MemoryStack stack=stackPush()){
+//			LongBuffer attach=stack.longs(color.getView(), 0, depth.getView());
+			LongBuffer attach=stack.longs(0, depth.getView());
+			
 			VkFramebufferCreateInfo framebufferInfo=VkFramebufferCreateInfo.callocStack(stack).sType(VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO);
 			
 			framebufferInfo.renderPass(renderPass.getHandle())
+			               .pAttachments(attach)
 			               .width(extent.width())
 			               .height(extent.height())
 			               .layers(1);
 			
 			
 			for(Frame frame : frames){
-				framebufferInfo.pAttachments(stack.longs(frame.colorFrame.getView(), depth.getView()));
-				
+				attach.put(0, frame.colorFrame.getView());
 				frame.frameBuffer=Vk.createFrameBuffer(gpu, framebufferInfo, stack.mallocLong(1));
 			}
 		}
@@ -180,7 +208,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		               .filter(f->UtilL.contains(acceptedFormats, f.format.handle)&&f.checkFeatures(tiling, features))
 		               .map(f->f.format.handle)
 		               .findFirst()
-		               .orElseThrow(()->new UnsupportedOperationException("Unable to find supported depth format"));
+		               .orElseThrow(()->new UnsupportedOperationException("Unable to find supported depth colorFormat"));
 	}
 	
 	private VkSurfaceFormatKHR chooseSwapSurfaceFormat(VkSurfaceFormatKHR.Buffer availableFormats){
@@ -229,8 +257,8 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		try(MemoryStack stack=stackPush()){
 			VkAttachmentDescription.Buffer attachments=VkAttachmentDescription.callocStack(2, stack);
 			attachments.get(0)//color attachment
-			           .format(getFormat())
-			           .samples(VK_SAMPLE_COUNT_1_BIT)
+			           .format(getColorFormat())
+			           .samples(samples)
 			           .loadOp(VK_ATTACHMENT_LOAD_OP_CLEAR)
 			           .storeOp(VK_ATTACHMENT_STORE_OP_STORE)
 			           .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
@@ -239,7 +267,7 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 			           .finalLayout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 			attachments.get(1)//depth attachment
 			           .format(findDepthFormat(VK_IMAGE_TILING_OPTIMAL))
-			           .samples(VK_SAMPLE_COUNT_1_BIT)
+			           .samples(samples)
 			           .loadOp(VK_ATTACHMENT_LOAD_OP_CLEAR)
 			           .storeOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
 			           .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
@@ -303,8 +331,8 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		return handle;
 	}
 	
-	public int getFormat(){
-		return format;
+	public int getColorFormat(){
+		return colorFormat;
 	}
 	
 	
@@ -321,7 +349,11 @@ public class VkSwapchain implements VkDestroyable, VkGpuCtx{
 		return imageAviable;
 	}
 	
-	public VkExtent2D getSize(){
+	public VkExtent2D getExtent(){
 		return extent;
+	}
+	
+	public IVec2iR getSize(){
+		return extentView;
 	}
 }

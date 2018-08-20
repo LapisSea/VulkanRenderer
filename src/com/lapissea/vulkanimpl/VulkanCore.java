@@ -1,57 +1,57 @@
 package com.lapissea.vulkanimpl;
 
 import com.lapissea.datamanager.IDataManager;
-import com.lapissea.glfw.BuffUtil;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
 import com.lapissea.util.event.change.ChangeRegistryBool;
-import com.lapissea.vec.Vec2f;
-import com.lapissea.vec.Vec2i;
-import com.lapissea.vec.color.ColorM;
+import com.lapissea.vec.Vec3f;
+import com.lapissea.vec.color.ColorMSolid;
 import com.lapissea.vec.color.IColorM;
+import com.lapissea.vec.color.IColorMSolid;
 import com.lapissea.vec.interf.IVec2iR;
+import com.lapissea.vulkanimpl.assets.ResourceManagerSourced;
+import com.lapissea.vulkanimpl.assets.ResourcePool;
+import com.lapissea.vulkanimpl.assets.TextureNode;
 import com.lapissea.vulkanimpl.devonly.ValidationLayers;
 import com.lapissea.vulkanimpl.devonly.VkDebugReport;
-import com.lapissea.vulkanimpl.renderer.model.VkModel;
-import com.lapissea.vulkanimpl.renderer.model.VkModelBuilder;
-import com.lapissea.vulkanimpl.renderer.model.VkModelFormat;
+import com.lapissea.vulkanimpl.exceptions.VkException;
+import com.lapissea.vulkanimpl.renderer.lighting.Attenuation;
+import com.lapissea.vulkanimpl.renderer.lighting.DirectionalLight;
+import com.lapissea.vulkanimpl.renderer.lighting.PointLight;
+import com.lapissea.vulkanimpl.renderer.model.VkMesh;
+import com.lapissea.vulkanimpl.renderer.model.VkMeshFormat;
 import com.lapissea.vulkanimpl.shaders.ShaderState;
 import com.lapissea.vulkanimpl.shaders.VkPipelineInput;
 import com.lapissea.vulkanimpl.shaders.VkShader;
-import com.lapissea.vulkanimpl.util.GlfwWindowVk;
-import com.lapissea.vulkanimpl.util.VkConstruct;
-import com.lapissea.vulkanimpl.util.VkDestroyable;
-import com.lapissea.vulkanimpl.util.VkImageAspect;
+import com.lapissea.vulkanimpl.util.*;
+import com.lapissea.vulkanimpl.util.format.VkDescriptor;
 import com.lapissea.vulkanimpl.util.types.*;
+import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
+import org.joml.SimplexNoise;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
+import java.util.*;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.util.UtilL.*;
+import static com.lapissea.vulkanimpl.VkSwapchain.*;
 import static com.lapissea.vulkanimpl.devonly.VkDebugReport.Type.*;
 import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
+import static com.lapissea.vulkanimpl.util.format.VkDescriptor.*;
+import static java.util.Arrays.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryStack.*;
-import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.EXTDebugReport.*;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
 
-public class VulkanCore implements VkDestroyable{
+public class VulkanCore implements VkDestroyable, Executor{
+	
 	public static final boolean VULKAN_INSTALLED;
 	
 	static{
@@ -59,14 +59,33 @@ public class VulkanCore implements VkDestroyable{
 		try{
 			System.loadLibrary("vulkan-1");
 			vulkanInstalled=true;
-		}catch(Throwable e){ }
+		}catch(Throwable e){
+//			e.printStackTrace();
+//			System.exit(-1);
+		}
 		VULKAN_INSTALLED=vulkanInstalled;
+		
+		if(DEV_ON){
+			TextUtil.__REGISTER_CUSTOM_TO_STRING(VkExtent2D.class, extent2D->extent2D.getClass().getSimpleName()+"{width="+extent2D.width()+", height="+extent2D.height()+"}");
+		}
+	}
+	
+	private IColorMSolid clearColor=IColorM.BLACK;// new ColorMSolid(0xC4F8FF);
+	
+	private final Deque<Runnable> toExecute=new ArrayDeque<>();
+	
+	@Override
+	public void execute(@NotNull Runnable command){
+		synchronized(toExecute){
+			toExecute.push(command);
+		}
 	}
 	
 	public static class Settings{
 		
 		public ChangeRegistryBool vSyncEnabled          =new ChangeRegistryBool(true);
 		public ChangeRegistryBool tripleBufferingEnabled=new ChangeRegistryBool(true);
+		
 	}
 	
 	public static final String ENGINE_NAME   ="JLapisor";
@@ -77,40 +96,50 @@ public class VulkanCore implements VkDestroyable{
 	private VkInstance instance;
 	
 	private VkGpu renderGpu;
-//	private VkGpu computeGpu;
 	
-	private       VkSwapchain  swapchain;
 	private final GlfwWindowVk window;
 	
 	private VkSurface surface;
 	
-	private VkShader     shader;
-	private VkRenderPass renderPass;
+	private Settings     settings=new Settings();
+	public  IDataManager assets;
+	public  IDataManager modelSource;
 	
-	private Settings settings=new Settings();
-	public IDataManager assets;
+	private ResourceManagerSourced<ByteBuffer, VkShaderCode> shaderSource;
 	
-	private VkCommandBufferM[] sceneCommandBuffers;
+	private SurfaceContext surfaceContext;
 	
-	private VkModel               model;
-	private VkTexture             modelTexture;
-	private VkUniform             mainUniform;
+	private List<VkMesh>                models      =new ArrayList<>();
+	private Map<VkMeshFormat, VkShader> shaderLookup=new HashMap<>();
+	private ResourcePool<VkTexture>     texturePool =new ResourcePool<>(s->new TextureNode(s, getRenderGpu()));
+	
+	private VkUniform mainUniform;
+	private VkUniform lightingUniform;
+	
 	private VkDescriptorSetLayout uniformLayout;
 	private VkDescriptorPool      descriptorPool;
-	private long                  descriptorSet;
+	
+	private long lastUpdate;
+	
+	public boolean commandBuffersDirty=true;
 	
 	
-	private       VulkanRender renderer    =new VulkanRender();
-	private final Object       recreateLock=new Object();
+	private      VulkanRender renderer    =new VulkanRender();
+	public final Object       recreateLock=new Object();
+	
+	public VkCamera camera=new VkCamera();
+	
+	public RenderQueue renderQueue=new RenderQueue();
 	
 	public VulkanCore(IDataManager assets, GlfwWindowVk window){
 		this.assets=assets;
 		this.window=window;
+		shaderSource=new ResourceManagerSourced<>(assets.subData("shaders"), VkShaderCode::new);
+		modelSource=assets.subData("models");
 	}
 	
 	public void createContext(){
-		
-		window.size.register(e->onWindowResize(e.getSource()));
+		window.size.register(this::onWindowResize);
 		
 		try(MemoryStack stack=stackPush()){
 			
@@ -127,199 +156,160 @@ public class VulkanCore implements VkDestroyable{
 		}
 		
 		if(DEV_ON){
-			debugReport=new VkDebugReport(this, List.of(ERROR, WARNING, PERFORMANCE_WARNING), List.of(/*INFORMATION*/));
+			debugReport=new VkDebugReport(this, asList(
+				ERROR
+				, WARNING
+				, PERFORMANCE_WARNING
+			                                          ), asList(
+				DEBUG
+//				, INFORMATION
+			                                                   ));
 		}
 		
 		surface=window.createSurface(this);
 		intGpus();
-		modelTexture=loadTexture("Birdy");
 		initModel();
 		initUniform();
 		initSurfaceDependant();
-		
-		Vec2i prevPos=new Vec2i(window.mousePos);
-		window.mousePos.register(e->{
-			bulge+=Math.sqrt(e.getSource().distanceTo(prevPos))/20;
-			prevPos.set(e.getSource());
-		});
+
+//		async(this::initModel, this);
 	}
 	
-	private VkTexture loadTexture(String name){
-		BufferedImage image;
-		try{
-			image=ImageIO.read(assets.getInStream("textures/"+name+".png"));
-		}catch(IOException e){
-			throw UtilL.uncheckedThrow(e);
-		}
-		
-		int width =image.getWidth();
-		int height=image.getHeight();
-		
-		ByteBuffer buff=BuffUtil.imageToBuffer(image, memAlloc(width*height*4));
-		
-		VkBuffer       stagingBuffer=renderGpu.createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, buff.capacity());
-		VkDeviceMemory stagingMemory=stagingBuffer.createMemory(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		
-		stagingMemory.memorySession(stagingBuffer.size, mem->{
-			mem.put(buff);
-			memFree(buff);
-		});
-		
-		VkImage textureImage=renderGpu.create2DImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT);
-		
-		VkDeviceMemory textureImageMemory=textureImage.createMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		
-		textureImage.transitionLayout(renderGpu.getTransferQueue(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-		textureImage.copyFromBuffer(renderGpu.getTransferQueue(), stagingBuffer);
-		textureImage.transitionLayout(renderGpu.getGraphicsQueue(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		
-		stagingMemory.destroy();
-		stagingBuffer.destroy();
-		return new VkTexture(textureImage, textureImageMemory).createView(VkImageAspect.COLOR).createSampler();
-	}
+	int dirLightCount  =1;
+	int pointLightCount=1;
+	
 	
 	private void initUniform(){
+		
 		try(MemoryStack stack=stackPush()){
 			int floatSize =Float.SIZE/Byte.SIZE;
+			int vec3Size  =floatSize*3;
 			int matrixSize=floatSize*16;
-			mainUniform=new VkUniform(renderGpu, matrixSize*3+floatSize, this::updateUniforms);
 			
-			uniformLayout=renderGpu.createDescriptorSetLayout(VK_SHADER_STAGE_VERTEX_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			                                                  VK_SHADER_STAGE_FRAGMENT_BIT, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-			
-			VkDescriptorPoolSize.Buffer poolSize=VkDescriptorPoolSize.callocStack(2);
-			poolSize.get(0)
-			        .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-			        .descriptorCount(1);
-			poolSize.get(1)
-			        .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-			        .descriptorCount(1);
-			
-			VkDescriptorPoolCreateInfo poolInfo=VkConstruct.descriptorPoolCreateInfo(stack);
-			poolInfo.pPoolSizes(poolSize)
-			        .maxSets(1);
-			descriptorPool=Vk.createDescriptorPool(renderGpu, poolInfo, stack.mallocLong(1));
-			
-			descriptorSet=descriptorPool.allocateDescriptorSets(uniformLayout.getBuffer());
-			
-			VkDescriptorBufferInfo.Buffer bufferInfo=VkDescriptorBufferInfo.callocStack(1, stack);
-			mainUniform.put(bufferInfo.get(0));
-			
-			VkDescriptorImageInfo.Buffer imageInfo=VkDescriptorImageInfo.callocStack(1, stack);
-			modelTexture.put(imageInfo.get(0));
+			mainUniform=new VkUniform(renderGpu, matrixSize*3, this::updateMainUniforms);
+			lightingUniform=new VkUniform(renderGpu, DirectionalLight.SIZE_BYTE*dirLightCount+PointLight.SIZE_BYTE*pointLightCount, this::updateLightUniforms);
 			
 			
-			VkWriteDescriptorSet.Buffer descriptorWrite=VkWriteDescriptorSet.callocStack(2, stack);
-			descriptorWrite.get(0)
-			               .sType(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET)
-			               .dstSet(descriptorSet)
-			               .descriptorType(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-			               .pBufferInfo(bufferInfo)
-			               .dstBinding(0)
-			               .dstArrayElement(0);
-			descriptorWrite.get(1)
-			               .sType(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET)
-			               .dstSet(descriptorSet)
-			               .descriptorType(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-			               .dstBinding(1)
-			               .dstArrayElement(0)
-			               .pImageInfo(imageInfo);
+			uniformLayout=renderGpu.createDescriptorSetLayout(VERTEX_UNIFORM_BUFF,
+			                                                  FRAGMENT_UNIFORM_BUFF,
+			                                                  FRAGMENT_IMAGE,
+			                                                  FRAGMENT_IMAGE);
 			
-			vkUpdateDescriptorSets(renderGpu.getDevice(), descriptorWrite, null);
+			VkDescriptor[] poolParts=uniformLayout.getParts();
+			poolParts[0]=poolParts[0].withUniform(mainUniform);
+			poolParts[1]=poolParts[1].withUniform(lightingUniform);
+			
+			descriptorPool=renderGpu.createDescriptorPool(models.size(), poolParts);
+			
 		}
+		
 	}
 	
-	float bulge;
+	private void updateLightUniforms(ByteBuffer byteBuffer){
+		
+		float tim=(float)(System.currentTimeMillis()%1000000000)/400F;
+		
+		Vec3f            normal=new Vec3f(1.3F, 2, 2).normalise();
+		DirectionalLight sun   =new DirectionalLight(normal, BlackBody.blackBodyColor(new ColorMSolid(), 1700+4000).mul(0.4F));
+		PointLight idk=new PointLight(camera.pos.clone().add(0, 0, 0), new ColorMSolid(
+			0.2F+SimplexNoise.noise(tim, 0)*0.01F,
+			0.3F+SimplexNoise.noise(tim, 0.25F)*0.01F,
+			0.5F+SimplexNoise.noise(tim, 0.5F)*0.01F
+		), Attenuation.fromRadius(40));
+		
+		
+		sun.put(byteBuffer);
+		idk.put(byteBuffer);
+		
+	}
 	
-	private void updateUniforms(ByteBuffer uniforms){
-		bulge=bulge*0.95F;
-		if(bulge<0.1) bulge=0.1F;
+	private void updateMainUniforms(ByteBuffer uniforms){
 		
 		float farPlane=1000;
 		
-		Matrix4f model     =new Matrix4f();
-		Matrix4f view      =new Matrix4f();
-		Matrix4f projection=new Matrix4f();
+		Matrix4f model=new Matrix4f();
+		Matrix4f view =new Matrix4f();
 		
-		double tim  =System.currentTimeMillis()/500D;
-		Vec2f  mouse=new Vec2f(window.mousePos).div(window.size).sub(0.5F);
+		int floatSize =Float.SIZE/Byte.SIZE;
+		int matrixSize=floatSize*16;
 		
-		model.rotate((float)((tim/2)%(Math.PI*2)), 0, 0, 1).scale(2F);
-		view.lookAt(mouse.x()*5, 2, -mouse.y()*10,
-		            0, 0, 0,
-		            0, 0, 1);
-		projection.perspective((float)Math.toRadians(80), window.size.divXY(), 0.001F, farPlane, true);
-		
-		FloatBuffer uniformsF=uniforms.asFloatBuffer();
-		
-		int matrixSize=16;
-		model.get(0, uniformsF);
-		view.get(matrixSize, uniformsF);
-		projection.get(matrixSize*2, uniformsF);
-		uniformsF.put(matrixSize*3, (float)Math.sqrt(bulge));
+		model.get(0, uniforms);
+		camera.getView().get(matrixSize, uniforms);
+		camera.getProjection(surfaceContext.getSwapchain().getSize()).get(matrixSize*2, uniforms);
 	}
 	
 	private void initModel(){
-		
-		VkModelBuilder modelBuilder=new VkModelBuilder(VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_R32G32_SFLOAT);
-		
-		modelBuilder.put3F(-0.5F, -0.5F, -0.5F).put4F(IColorM.randomRGBA()).put2F(0, 0).next();
-		modelBuilder.put3F(-0.5F, +0.5F, -0.5F).put4F(IColorM.randomRGBA()).put2F(1, 0).next();
-		modelBuilder.put3F(+0.5F, +0.5F, -0.5F).put4F(IColorM.randomRGBA()).put2F(1, 1).next();
-		modelBuilder.put3F(+0.5F, -0.5F, -0.5F).put4F(IColorM.randomRGBA()).put2F(0, 1).next();
-		
-		modelBuilder.put3F(-0.5F, -0.5F, +0.5F).put4F(IColorM.randomRGBA()).put2F(0, 1).next();
-		modelBuilder.put3F(-0.5F, +0.5F, +0.5F).put4F(IColorM.randomRGBA()).put2F(0, 0).next();
-		modelBuilder.put3F(+0.5F, +0.5F, +0.5F).put4F(IColorM.randomRGBA()).put2F(1, 0).next();
-		modelBuilder.put3F(+0.5F, -0.5F, +0.5F).put4F(IColorM.randomRGBA()).put2F(1, 1).next();
-		
-		modelBuilder.addIndices(
-			0, 1, 2,
-			0, 2, 3,
-			4, 6, 5,
-			4, 7, 6,
-			0, 4, 1,
-			4, 5, 1,
-			2, 1, 5,
-			2, 5, 6,
-			3, 7, 4,
-			4, 0, 3,
-			6, 3, 2,
-			3, 6, 7
-		                       );
-		
-		model=modelBuilder.bake(renderGpu);
+		List<VkMesh> b=ModelLoader.load(renderGpu, modelSource, "bow-g\\bow.obj");
+		List<VkMesh> a=ModelLoader.load(renderGpu, modelSource, "crysponza\\untitled.obj");
+		List<VkMesh> c=ModelLoader.load(renderGpu, modelSource, "toothless\\toothless.obj");
+//		async((Runnable)()->{
+		models.addAll(a);
+		models.addAll(b);
+		models.addAll(c);
+//		}, this);
+//		async((Runnable)()->models.addAll(a), this);
 	}
 	
 	private void initSurfaceDependant(){
-		swapchain=new VkSwapchain(renderGpu, surface, window.size);
-		renderPass=swapchain.createRenderPass();
-		swapchain.initFrameBuffers(renderPass);
-		shader=createGraphicsPipeline(model.getFormat());
-		initScene();
+		try{
+			surfaceContext=new SurfaceContext(renderGpu, surface, window.size, VK_SAMPLE_COUNT_1_BIT);
+		}catch(VkException e){
+			if(ZERO_EXTENT_MESSAGE.equals(e.getMessage())) return;
+			throw e;
+		}
+		shaderLookup.clear();
+		commandBuffersDirty=true;
 	}
 	
-	private void initScene(){
-		
-		sceneCommandBuffers=renderGpu.getGraphicsQueue().getPool().allocateCommandBuffers(swapchain.getFrames().size());
-		for(VkSwapchain.Frame frame : swapchain.getFrames()){
-			VkCommandBufferM sceneBuffer=sceneCommandBuffers[frame.index];
+	private VkShader makeShader(VkMeshFormat format){
+		try(MemoryStack stack=stackPush()){
+			return surfaceContext.createGraphicsPipeline(
+				shaderSource,
+				new ShaderState()
+					.setCullMode(VkShader.Cull.FRONT)
+					.setInput(new VkPipelineInput(format))
+				, "test",
+				stack.longs(uniformLayout.getHandle()));
+		}
+	}
+	
+	private void updateFrameBuffers(){
+		if(!commandBuffersDirty) return;
+		commandBuffersDirty=false;
+//		try{
+		surfaceContext.updateCommandBuffers((frame, sceneBuffer)->{
 			
-			sceneBuffer.begin();
-			renderPass.begin(sceneBuffer, frame.getFrameBuffer(), swapchain.getSize(), new ColorM(0, 0, 0, 0));
+			renderQueue.processor=(shader, meshes)->{
+				
+				shader.bind(sceneBuffer);
+				
+				for(VkMesh model : models){
+					
+					shader.bindDescriptorSets(sceneBuffer, model.getDescriptor(descriptorPool, uniformLayout, texturePool));
+					
+					model.bind(sceneBuffer);
+					model.render(sceneBuffer);
+					
+				}
+				
+			};
 			
+			surfaceContext.getRenderPass().begin(sceneBuffer, frame.getFrameBuffer(), surfaceContext.getSwapchain().getExtent(), clearColor);
 			
-			shader.bind(sceneBuffer);
-			try(MemoryStack stack=stackPush()){
-				shader.bindDescriptorSets(sceneBuffer, stack.longs(descriptorSet));
+			try(var e=renderQueue){
+				for(VkMesh model : models){
+					e.add(shaderLookup.computeIfAbsent(model.getFormat(), this::makeShader), model);
+				}
 			}
-			
-			model.bind(sceneBuffer);
-			model.render(sceneBuffer);
+//				LogUtil.println(shaderLookup);
 			
 			sceneBuffer.endRenderPass();
-			sceneBuffer.end();
-		}
+		});
+//		}catch(VkException.OutOfDeviceMemory e){
+//			LogUtil.println("Growing descriptor pool");
+//			commandBuffersDirty=true;
+//			recreateUniforms();
+//		}
 	}
 	
 	private void validateList(List<String> supported, List<String> requested, String type){
@@ -329,7 +319,7 @@ public class VulkanCore implements VkDestroyable{
 		                            .collect(Collectors.toList());
 		
 		if(!fails.isEmpty()){
-			throw new IllegalStateException(TextUtil.plural(type, fails.size())+" not supported: "+fails.stream().collect(Collectors.joining(", ")));
+			throw new IllegalStateException(TextUtil.plural(type, fails.size())+" not supported: "+String.join(", ", fails));
 		}
 	}
 	
@@ -341,105 +331,35 @@ public class VulkanCore implements VkDestroyable{
 			extensionNames.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 			
 		}
-		
 		validateList(Vk.enumerateInstanceLayerProperties(stack).stream().map(VkLayerProperties::layerNameString).collect(Collectors.toList()), layerNames, "Layer");
 		
 		PointerBuffer requ=glfwGetRequiredInstanceExtensions();
+		if(requ==null) throw new IllegalStateException("GLFW failed to deliver required Vulkan instance extensions. Please try to reinstall or update your graphics driver!");
+		
 		Stream.generate(requ::getStringUTF8).limit(requ.limit()).forEach(extensionNames::add);
 		
 		validateList(Vk.enumerateInstanceExtensionProperties(stack).stream().map(VkExtensionProperties::extensionNameString).collect(Collectors.toList()), extensionNames, "Extension");
 		
 	}
 	
-	private long getGpuVRam(VkGpu g){
-		return g.getMemoryProperties()
-		        .memoryHeaps()
-		        .stream()
-		        .filter(heap->(heap.flags()&VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)==1)
-		        .mapToLong(VkMemoryHeap::size)
-		        .max()
-		        .orElse(0);
-	}
-	
 	private void intGpus(){
-		try(MemoryStack stack=stackPush()){
-			List<VkGpu> gpus=Arrays.stream(Vk.getPhysicalDevices(stack, instance)).map(d->new VkGpu(this, d)).collect(Collectors.toList());
-			if(gpus.isEmpty()) throw new RuntimeException("No devices support Vulkan");
-			
-			List<String> renderExtensions =new ArrayList<>(List.of(VK_KHR_SWAPCHAIN_EXTENSION_NAME));
-			List<String> computeExtensions=new ArrayList<>(List.of());
-			
-			Comparator<VkGpu> sort=(g1, g2)->-Long.compare(getGpuVRam(g1), getGpuVRam(g2));
-			
-			renderGpu=gpus.stream()
-			              .filter(gpu->{
-				
-				              if(!gpu.getDeviceExtensionProperties().containsAll(renderExtensions)) return false;
-				
-				              if(gpu.getGraphicsQueue()==null||
-				                 gpu.getSurfaceQueue()==null||
-				                 gpu.getTransferQueue()==null) return false;
-				
-				              VkPhysicalDeviceFeatures features=gpu.getPhysicalFeatures();
-				
-				              return features.geometryShader()&&
-				                     features.shaderClipDistance()&&
-				                     features.shaderTessellationAndGeometryPointSize()&&
-				                     features.tessellationShader();
-			              })
-			              .sorted(sort)
-			              .findFirst()
-			              .orElseThrow(()->new RuntimeException("No Vulkan compatible devices can display to a screen or do not meet minimal requirements"));
-
-//			computeGpu=gpus.stream()
-//			               .filter(gpu->gpu.getDeviceExtensionProperties().containsAll(computeExtensions)&&gpu.getTransferQueue()!=null)
-//			               .sorted(sort.thenComparing((g1, g2)->Boolean.compare(g1==renderGpu, g2==renderGpu)))
-//			               .findFirst()
-//			               .orElseThrow(()->new RuntimeException("No Vulkan compatible devices can display to a screen or do not meet minimal requirements"));
-			
-			gpus.remove(renderGpu);
-//			gpus.remove(computeGpu);
-			gpus.forEach(VkGpu::destroy);
-
-//			if(renderGpu==computeGpu){
-			renderGpu.init(null, Vk.stringsToPP(Stream.concat(renderExtensions.stream(), computeExtensions.stream()).distinct().collect(Collectors.toList()), stack));
-			LogUtil.println("Using GPU called", renderGpu.getPhysicalProperties().deviceNameString(), "as render device");
-//			}else{
-//				renderGpu.init(null, Vk.stringsToPP(renderExtensions, stack));
-//				computeGpu.init(null, Vk.stringsToPP(computeExtensions, stack));
-//			}
-			
-		}
-	}
-	
-	private VkShader createGraphicsPipeline(VkModelFormat format){
-		VkShader    shader=new VkShader(assets.subData("shaders"), "test", getRenderGpu(), surface);
-		ShaderState state =new ShaderState();
-		
-		state.setViewport(window.size);
-		state.setInput(new VkPipelineInput(format));
-		state.setCullMode(VkShader.Cull.NONE);
-		try(MemoryStack stack=stackPush()){
-			shader.init(state, renderPass, stack.longs(uniformLayout.getHandle()));
-		}
-		
-		return shader;
-	}
-	
-	private void recreateSurface(){
-		synchronized(recreateLock){
-			renderGpu.waitIdle();
-			destroySurfaceDependant();
-			initSurfaceDependant();
+		try(GpuInitializer init=new GpuInitializer(this)){
+			renderGpu=init.find(asList(VK_KHR_SWAPCHAIN_EXTENSION_NAME));
 		}
 	}
 	
 	private void destroySurfaceDependant(){
-		forEach(sceneCommandBuffers, VkCommandBufferM::destroy);
-		sceneCommandBuffers=null;
-		shader.destroy();
-		renderPass.destroy();
-		swapchain.destroy();
+		if(surfaceContext==null) return;
+		
+		renderGpu.waitIdle();
+		destroyShaders();
+		surfaceContext.destroy();
+		surfaceContext=null;
+	}
+	
+	private void destroyShaders(){
+		shaderLookup.values().forEach(VkShader::destroy);
+		shaderLookup.clear();
 	}
 	
 	@Override
@@ -449,18 +369,23 @@ public class VulkanCore implements VkDestroyable{
 		destroySurfaceDependant();
 		
 		surface.destroy();
+		surface=null;
 		
-		model.destroy();
-		modelTexture.destroy();
+		models.forEach(VkMesh::destroy);
+		models.clear();
 		
-		uniformLayout.destroy();
-		mainUniform.destroy();
+		texturePool.destroy();
+		
+		destroyUniforms();
 		
 		descriptorPool.destroy();
+		descriptorPool=null;
 		
 		renderGpu.destroy();
+		renderGpu=null;
 		
 		renderer.destroy();
+		renderer=null;
 		
 		if(DEV_ON){
 			debugReport.destroy();
@@ -468,27 +393,66 @@ public class VulkanCore implements VkDestroyable{
 		vkDestroyInstance(instance, null);
 	}
 	
+	private void destroyUniforms(){
+		
+		uniformLayout.destroy();
+		uniformLayout=null;
+		mainUniform.destroy();
+		mainUniform=null;
+		lightingUniform.destroy();
+		lightingUniform=null;
+	}
+	
+	private void recreateUniforms(){
+		getRenderGpu().waitIdle();
+		destroyUniforms();
+		initUniform();
+	}
+	
 	private void onWindowResize(IVec2iR size){
-		recreateSurface();
+		recreateSurfaceDependant();
+	}
+	
+	private void recreateSurfaceDependant(){
+		synchronized(recreateLock){
+			renderGpu.waitIdle();
+			destroySurfaceDependant();
+			initSurfaceDependant();
+		}
 	}
 	
 	public void render(){
-		mainUniform.updateBuffer();
-		submitRender();
-	}
-	
-	private void submitRender(){
+		if(surfaceContext==null) return;
+		synchronized(toExecute){
+			while(!toExecute.isEmpty()){
+				toExecute.pop().run();
+			}
+		}
+		
 		synchronized(recreateLock){
 			
-			VkSwapchain.Frame frame=swapchain.acquireNextFrame();
 			
-			if(frame==null){
-				recreateSurface();
-				return;
+			updateFrameBuffers();
+			
+			mainUniform.updateBuffer();
+			lightingUniform.updateBuffer();
+			
+			VkSwapchain.Frame frame=surfaceContext.getSwapchain().acquireNextFrame();
+			
+			if(frame==null||renderer.render(surfaceContext, frame)){
+				recreateSurfaceDependant();
 			}
 			
-			if(renderer.render(swapchain, frame, sceneCommandBuffers[frame.index])) recreateSurface();
-			
+			long tim=System.currentTimeMillis();
+			if(lastUpdate<tim){
+				lastUpdate=tim+1000;
+				
+				//use count to force call on all shaders
+				if(shaderLookup.values().stream().filter(VkShader::updateCode).count()>0){
+					commandBuffersDirty=true;
+					updateFrameBuffers();
+				}
+			}
 		}
 	}
 	
@@ -499,8 +463,6 @@ public class VulkanCore implements VkDestroyable{
 	public VkGpu getRenderGpu(){
 		return renderGpu;
 	}
-
-//	public VkGpu getComputeGpu(){ return computeGpu; }
 	
 	public GlfwWindowVk getWindow(){
 		return window;

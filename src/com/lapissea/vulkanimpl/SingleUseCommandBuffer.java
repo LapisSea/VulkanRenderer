@@ -55,7 +55,7 @@ public class SingleUseCommandBuffer implements AutoCloseable{
 	@Override
 	protected void finalize(){
 		if(!closed){
-			UtilL.exitWithErrorMsg("SingleUseCommandBuffer not closed!");
+			throw UtilL.exitWithErrorMsg("SingleUseCommandBuffer not closed!");
 		}
 	}
 }

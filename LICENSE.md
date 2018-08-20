@@ -97,8 +97,8 @@ above, provided that you also meet all of these conditions:
     stating that you changed the files and the date of any change.
 
     b) You must cause any work that you distribute or publish, that in
-    whole or in part contains or is derived from the Program or any
-    part thereof, to be licensed as a whole at no charge to all third
+    whole or in signature contains or is derived from the Program or any
+    signature thereof, to be licensed as a whole at no charge to all third
     parties under the terms of this License.
 
     c) If the modified program normally reads commands interactively
@@ -117,10 +117,10 @@ identifiable sections of that work are not derived from the Program,
 and can be reasonably considered independent and separate works in
 themselves, then this License, and its terms, do not apply to those
 sections when you distribute them as separate works.  But when you
-distribute the same sections as part of a whole which is a work based
+distribute the same sections as signature of a whole which is a work based
 on the Program, the distribution of the whole must be on the terms of
 this License, whose permissions for other licensees extend to the
-entire whole, and thus to each and every part regardless of who wrote it.
+entire whole, and thus to each and every signature regardless of who wrote it.
 
 Thus, it is not the intent of this section to claim rights or contest
 your rights to work written entirely by you; rather, the intent is to

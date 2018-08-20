@@ -3,10 +3,10 @@ package com.lapissea.vulkanimpl.devonly;
 import com.lapissea.util.LogUtil;
 import com.lapissea.vec.Vec2i;
 import com.lapissea.vulkanimpl.util.DevelopmentInfo;
-import com.lapissea.vulkanimpl.util.format.VkFormatInfo;
-import com.lapissea.vulkanimpl.util.format.VkFormatInfo.Component;
-import com.lapissea.vulkanimpl.util.format.VkFormatInfo.ComponentType;
-import com.lapissea.vulkanimpl.util.format.VkFormatInfo.StorageType;
+import com.lapissea.vulkanimpl.util.format.VkFormat;
+import com.lapissea.vulkanimpl.util.format.VkFormat.Component;
+import com.lapissea.vulkanimpl.util.format.VkFormat.ComponentType;
+import com.lapissea.vulkanimpl.util.format.VkFormat.StorageType;
 import org.lwjgl.vulkan.VK10;
 
 import java.lang.reflect.Field;
@@ -51,8 +51,13 @@ public class VkFormatAnalysis{
 				else if(i==1) return "Collections.singletonList("+s+")";
 				else return "Arrays.asList("+s+")";
 			};
-			String line="INFO.put("+v.handle+", new "+VkFormatInfo.class.getSimpleName()+"("+v.handle+", \""+v.name+"\", "+
-			            wrapp.apply(v.components.size(), v.components.stream().map(c->"new Component(ComponentType."+c.type+", "+c.bitSize+", StorageType."+c.storageType+", "+c.signed+(c.packId==-1?"":", "+c.packId)+")").collect(Collectors.joining(", ")))+", "+
+			String line="INFO.put("+v.handle+", new "+VkFormat.class.getSimpleName()+"("+v.handle+", \""+v.name+"\", "+
+			            wrapp.apply(v.components.size(), v.components.stream().map(c->"new "+Component.class.getSimpleName()+"("+
+			                                                                          ComponentType.class.getSimpleName()+"."+c.type+", "+
+			                                                                          c.bitSize+", "+
+			                                                                          StorageType.class.getSimpleName()+"."+c.storageType+", "+
+			                                                                          c.signed+(c.packId==-1?"":", "+c.packId)+")"
+			                                                                      ).collect(Collectors.joining(", ")))+", "+
 			            wrapp.apply(v.packSizes.size(), v.packSizes.stream().map(Object::toString).collect(Collectors.joining(", ")))+", "+
 			            (v.compression==null?"null":"\""+v.compression+"\"")+", "+
 			            v.isBlock+", "+
@@ -62,7 +67,7 @@ public class VkFormatAnalysis{
 			}
 		});
 		
-		LogUtil.__.destroy();
+		LogUtil.Init.destroy();
 		LogUtil.println("List<Component> EC=Collections.emptyList();\n"+
 		                "List<Integer>   EP=Collections.emptyList();");
 		lines.stream().sorted(Comparator.comparingInt(String::length)).forEach(LogUtil::println);
@@ -70,7 +75,7 @@ public class VkFormatAnalysis{
 		System.exit(0);
 	}
 	
-	public static List<VkFormatInfo> compile(){
+	public static List<VkFormat> compile(){
 		Pattern compElementPattern, blockSizePattern;
 		{
 			StringBuilder sb=new StringBuilder("[");
@@ -82,7 +87,7 @@ public class VkFormatAnalysis{
 		}
 		
 		
-		List<VkFormatInfo> allInfo=new ArrayList<>();
+		List<VkFormat> allInfo=new ArrayList<>();
 		for(Field field : VK10.class.getDeclaredFields()){
 			String name=field.getName();
 			if(!name.startsWith("VK_FORMAT_")||name.startsWith("VK_FORMAT_FEATURE_")) continue;
@@ -97,10 +102,10 @@ public class VkFormatAnalysis{
 				compBuild.stream().map(ComponentBuild::finish).forEach(components::add);
 				compBuild.clear();
 			};
-			VkFormatInfo info       =null;
-			String       compression=null;
-			boolean      isBlock    =false;
-			Vec2i        blockSize  =new Vec2i(4, 4);
+			VkFormat info       =null;
+			String   compression=null;
+			boolean  isBlock    =false;
+			Vec2i    blockSize  =new Vec2i(4, 4);
 			
 			Predicate<String> detectStorageType=typeName->{
 				try{
@@ -192,7 +197,7 @@ public class VkFormatAnalysis{
 			components.trimToSize();
 			packSizes.trimToSize();
 			try{
-				allInfo.add(new VkFormatInfo(field.getInt(null), name, components, packSizes, compression, isBlock, blockSize.immutable()));
+				allInfo.add(new VkFormat(field.getInt(null), name, components, packSizes, compression, isBlock, blockSize.immutable()));
 			}catch(IllegalAccessException e){}
 		}
 		return allInfo;

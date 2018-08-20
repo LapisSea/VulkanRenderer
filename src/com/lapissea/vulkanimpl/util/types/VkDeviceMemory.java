@@ -30,7 +30,7 @@ public class VkDeviceMemory implements VkGpuCtx, VkDestroyable{
 			this.byteSize=byteSize;
 			this.internalPointer=internalPointer;
 			
-			memory=map(offset, byteSize, pointer).getByteBuffer((int)byteSize);
+			memory=map(offset, byteSize, pointer).getByteBuffer((int)byteSize).order(ByteOrder.nativeOrder());
 		}
 		
 		@Override
@@ -40,10 +40,10 @@ public class VkDeviceMemory implements VkGpuCtx, VkDestroyable{
 		}
 	}
 	
-	private final VkGpu      gpu;
-	private final LongBuffer handle;
+	private final VkGpu               gpu;
+	private final LongBuffer          handle;
 	private final VkMappedMemoryRange range=VkMappedMemoryRange.calloc().sType(VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE);
-	public final long size;
+	public final  long                size;
 	
 	public VkDeviceMemory(VkGpuCtx gpuCtx, LongBuffer dest, long size){
 		gpu=gpuCtx.getGpu();

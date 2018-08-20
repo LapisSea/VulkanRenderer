@@ -1,6 +1,6 @@
 package com.lapissea.vulkanimpl.util.types;
 
-import com.lapissea.vec.color.ColorM;
+import com.lapissea.vec.color.IColorMSolid;
 import com.lapissea.vulkanimpl.VkGpu;
 import com.lapissea.vulkanimpl.util.VkDestroyable;
 import com.lapissea.vulkanimpl.util.VkGpuCtx;
@@ -17,13 +17,15 @@ public class VkRenderPass implements VkDestroyable, VkGpuCtx{
 	
 	private final VkGpu gpu;
 	private final long  handle;
+	public final  int   samples;
 	
-	public VkRenderPass(VkGpu gpu, long handle){
+	public VkRenderPass(VkGpu gpu, long handle, int samples){
 		this.gpu=gpu;
 		this.handle=handle;
+		this.samples=samples;
 	}
 	
-	public void begin(VkCommandBufferM cmd, long frameBuffer, VkExtent2D size, ColorM clearColor){
+	public void begin(VkCommandBufferM cmd, long frameBuffer, VkExtent2D size, IColorMSolid clearColor){
 		try(MemoryStack stack=stackPush()){
 			
 			VkRenderPassBeginInfo renderPassInfo=VkRenderPassBeginInfo.callocStack(stack);
@@ -37,12 +39,12 @@ public class VkRenderPass implements VkDestroyable, VkGpuCtx{
 			              .float32(0, clearColor.r())
 			              .float32(1, clearColor.g())
 			              .float32(2, clearColor.b())
-			              .float32(3, clearColor.a());
+			              .float32(3, 1);
 			
 			clearColorBuff.get(1).depthStencil().set(1, 0);
 			renderPassInfo.pClearValues(clearColorBuff);
 			
-			vkCmdBeginRenderPass(cmd, renderPassInfo, cmd.isPrimary?VK_SUBPASS_CONTENTS_INLINE:VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+			vkCmdBeginRenderPass(cmd, renderPassInfo, cmd.isPrimary()?VK_SUBPASS_CONTENTS_INLINE:VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 		}
 	}
 	

@@ -2,7 +2,6 @@ package com.lapissea.vulkanimpl.devonly;
 
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
 import com.lapissea.vulkanimpl.Vk;
 import com.lapissea.vulkanimpl.VulkanCore;
 import com.lapissea.vulkanimpl.util.DevelopmentInfo;
@@ -34,9 +33,9 @@ public class VkDebugReport{
 				while(message.charAt(pos)!=']'){
 					id.append(message.charAt(pos++));
 				}
-				
+
 //				if(id.toString().equals("0x9"))throw new RuntimeException();
-		
+				
 				if(message.substring(pos+4).startsWith("CREATE")){
 					StackTraceElement[] stack=Thread.currentThread().getStackTrace();
 					
@@ -53,10 +52,11 @@ public class VkDebugReport{
 			List<String>  msgLin=TextUtil.wrapLongString(message, 100);
 			StringBuilder msg   =new StringBuilder().append(type).append(": [").append(prefix).append("] Code ").append(code).append(": ");
 			
-			if(msgLin.size()>1) msg.append("\n").append(TextUtil.wrappedString(UtilL.array(msgLin)));
+			if(msgLin.size()>1) msg.append("\n").append(TextUtil.wrappedString(msgLin.toArray(new String[msgLin.size()])));
 			else msg.append(msgLin.get(0));
 			
 			if(errTypes.contains(type)) throw new RuntimeException(msg.toString());
+			
 			LogUtil.println(msg);
 		});
 	}

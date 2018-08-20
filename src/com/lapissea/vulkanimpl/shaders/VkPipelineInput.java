@@ -1,12 +1,12 @@
 package com.lapissea.vulkanimpl.shaders;
 
-import com.lapissea.vulkanimpl.renderer.model.VkModelFormat;
+import com.lapissea.vulkanimpl.renderer.model.VkMeshFormat;
 
 public class VkPipelineInput{
 	
-	public final VkModelFormat format;
+	public final VkMeshFormat format;
 	
-	public VkPipelineInput(VkModelFormat format){
+	public VkPipelineInput(VkMeshFormat format){
 		this.format=format;
 	}
 }

@@ -1,7 +1,7 @@
 /*
 /*/
 !/src/
-!/res/
+!/res/shaders
 !.gitignore
 !/LICENSE.md
 !/README.md

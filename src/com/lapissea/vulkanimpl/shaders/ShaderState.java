@@ -1,61 +1,70 @@
 package com.lapissea.vulkanimpl.shaders;
 
 import com.lapissea.vec.Vec2i;
+import com.lapissea.vec.color.ColorM;
+import com.lapissea.vec.color.IColorM;
 import com.lapissea.vec.interf.IVec2iR;
-import com.lapissea.vulkanimpl.renderer.model.VkModelFormat;
+import com.lapissea.vulkanimpl.renderer.model.VkMeshFormat;
 import com.lapissea.vulkanimpl.shaders.states.VkBlendMode;
 import com.lapissea.vulkanimpl.shaders.states.VkDrawMode;
+import com.lapissea.vulkanimpl.shaders.states.VkSample;
 import com.lapissea.vulkanimpl.util.VkConstruct;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
-import static com.lapissea.vulkanimpl.util.DevelopmentInfo.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class ShaderState{
 	
-	private static final int[] SAMPLE_LEVELS={
-		VK_SAMPLE_COUNT_1_BIT,
-		VK_SAMPLE_COUNT_2_BIT,
-		VK_SAMPLE_COUNT_4_BIT,
-		VK_SAMPLE_COUNT_8_BIT,
-		VK_SAMPLE_COUNT_16_BIT,
-		VK_SAMPLE_COUNT_32_BIT,
-		VK_SAMPLE_COUNT_64_BIT
-	};
+	public static final int[] EMPTY={};
 	
 	private       boolean         blending       =false;
-	private       boolean         supersampling  =false;
-	private       int             sampleLevel    =0;
+	private       boolean         superSampling  =false;
+	private       boolean         alphaToOne     =false;
+	private       VkSample        sampleLevel    =VkSample.SAMPLE1;
 	private       VkDrawMode      drawMode       =VkDrawMode.TRIANGLES;
 	private       VkBlendMode     blendMode      =VkBlendMode.NO_BLEND;
-	private       int[]           dynamicStates  ={};
+	private       int[]           dynamicStates  =EMPTY;
 	private       boolean         scissorsEnabled=false;
 	private final int[]           scissors       ={0, 0, 0, 0};
 	private final Vec2i           viewport       =new Vec2i();
-	private       VkPipelineInput input          =new VkPipelineInput(new VkModelFormat(0));
+	private       VkPipelineInput input          =new VkPipelineInput(new VkMeshFormat(new int[1]));
 	private       VkShader.Cull   cullMode       =VkShader.Cull.FRONT;
+	private final ColorM          blendingFactor =new ColorM(0, 0, 0, 0);
+	
+	public ShaderState setBlendingFactor(IColorM blendingFactor){
+		this.blendingFactor.set(blendingFactor);
+		return this;
+	}
 	
 	public ShaderState setBlending(boolean blending){
 		this.blending=blending;
 		return this;
 	}
 	
-	public void setSampleLevel(int sampleLevel){
+	public ShaderState setAlphaToOne(boolean alphaToOne){
+		this.alphaToOne=alphaToOne;
+		return this;
+	}
+	
+	public ShaderState setSampleLevel(VkSample sampleLevel){
 		this.sampleLevel=sampleLevel;
+		return this;
 	}
 	
-	public void setCullMode(VkShader.Cull cullMode){
+	public ShaderState setCullMode(VkShader.Cull cullMode){
 		this.cullMode=cullMode;
+		return this;
 	}
 	
-	public void setInput(VkPipelineInput input){
+	public ShaderState setInput(VkPipelineInput input){
 		this.input=input;
+		return this;
 	}
 	
-	public void setSupersampling(boolean supersampling){
-		this.supersampling=supersampling;
+	public void setSuperSampling(boolean superSampling){
+		this.superSampling=superSampling;
 	}
 	
 	public void setDrawMode(VkDrawMode drawMode){
@@ -84,19 +93,14 @@ public class ShaderState{
 	
 	public void write(MemoryStack stack, VkGraphicsPipelineCreateInfo pipelineInfo){
 		
-		if(DEV_ON){
-			if(sampleLevel<0) throw new IllegalArgumentException("Sample power of 2 can not be negative!");
-			if(sampleLevel>=SAMPLE_LEVELS.length) throw new IllegalArgumentException((1<<sampleLevel)+" samples per pixel is to much!");
-		}
-		
 		VkPipelineMultisampleStateCreateInfo multisampling=VkPipelineMultisampleStateCreateInfo.callocStack(stack);
 		multisampling.sType(VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO)
-		             .sampleShadingEnable(supersampling)
-		             .rasterizationSamples(SAMPLE_LEVELS[sampleLevel])//samples per pixel
+		             .sampleShadingEnable(superSampling)
+		             .rasterizationSamples(sampleLevel.handle)//samples per pixel
 		             .minSampleShading(1)
 		             .pSampleMask(null)//custom sampling mask... you need this because?????
 		             .alphaToCoverageEnable(false)
-		             .alphaToOneEnable(false);
+		             .alphaToOneEnable(alphaToOne);
 		
 		
 		VkPipelineColorBlendAttachmentState.Buffer colorBlending=blendMode.write(VkPipelineColorBlendAttachmentState.callocStack(1, stack));
